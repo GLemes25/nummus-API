@@ -17,6 +17,7 @@ import { env } from "./lib/env.js";
 import { aiRoutes } from "./routes/ai.js";
 import { categoryRoutes } from "./routes/categories.js";
 import { transactionRoutes } from "./routes/transactions.js";
+import { userRoutes } from "./routes/users.js";
 import { walletRoutes } from "./routes/wallets.js";
 
 const envToLogger = {
@@ -77,6 +78,7 @@ await app.register(transactionRoutes, { prefix: "/transactions" });
 await app.register(walletRoutes, { prefix: "/wallets" });
 await app.register(categoryRoutes, { prefix: "/categories" });
 await app.register(aiRoutes, { prefix: "/ai" });
+await app.register(userRoutes, { prefix: "/users" });
 
 app.withTypeProvider<ZodTypeProvider>().route({
   method: "GET",
