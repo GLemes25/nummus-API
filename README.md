@@ -43,13 +43,13 @@ A documentação interativa estará em `http://localhost:3333/documentation`.
 
 ## Scripts
 
-| Comando | Descrição |
-|---|---|
-| `pnpm dev` | Inicia o servidor em modo watch |
-| `pnpm build` | Compila o TypeScript para `dist/` |
-| `pnpm start` | Inicia o servidor compilado |
-| `pnpm db:generate` | Gera o Prisma Client |
-| `pnpm db:migrate` | Roda as migrations |
+| Comando            | Descrição                         |
+| ------------------ | --------------------------------- |
+| `pnpm dev`         | Inicia o servidor em modo watch   |
+| `pnpm build`       | Compila o TypeScript para `dist/` |
+| `pnpm start`       | Inicia o servidor compilado       |
+| `pnpm db:generate` | Gera o Prisma Client              |
+| `pnpm db:migrate`  | Roda as migrations                |
 
 ## Nota de UI para Clientes da API
 
