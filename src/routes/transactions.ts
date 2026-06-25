@@ -13,7 +13,7 @@ export const transactionRoutes = async (app: FastifyInstance) => {
         walletId: z.uuid(),
         categoryId: z.uuid(),
         amount: z.number().positive(),
-        type: z.enum(["INCOME", "EXPENSE", "TRANSFER"]),
+        type: z.enum(["INCOME", "EXPENSE", "BALANCE_ADJUSTMENT"]),
         date: z.string().datetime(),
         description: z.string(),
       }),

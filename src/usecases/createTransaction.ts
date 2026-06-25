@@ -1,29 +1,29 @@
 import { prisma } from "../lib/prisma.js";
 
-// Defina a interface do input (DTO)
-interface CreateTransactionInput {
+import type { PaymentMethod, TransactionType } from "@prisma/client";
+
+type CreateTransactionInput = {
   userId: string;
   walletId: string;
   categoryId: string;
   amount: number;
-  type: "INCOME" | "EXPENSE" | "TRANSFER";
+  type: TransactionType;
+  paymentMethod?: PaymentMethod;
   date: Date;
   description: string;
-}
+};
 
-// Exporte uma função pura/assíncrona
 export const createTransaction = async (data: CreateTransactionInput) => {
-  const transaction = await prisma.transaction.create({
+  return prisma.transaction.create({
     data: {
       userId: data.userId,
       walletId: data.walletId,
       categoryId: data.categoryId,
       amount: data.amount,
       type: data.type,
+      paymentMethod: data.paymentMethod ?? "CASH",
       date: data.date,
       description: data.description,
     },
   });
-
-  return transaction;
 };

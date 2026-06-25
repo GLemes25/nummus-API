@@ -6,38 +6,105 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Better Auth Models ────────────────────────────────────────────────────
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  BALANCE_ADJUSTMENT
+}
+
+enum PaymentMethod {
+  CASH
+  PIX
+  BANK_TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum InvestmentType {
+  FIXED_INCOME
+  VARIABLE_INCOME
+  CRYPTO
+  REAL_ESTATE
+  MULTIMARKET
+}
+
+enum InvestmentLogType {
+  BUY
+  SELL
+  YIELD
+}
+
+enum SyncStatus {
+  OK
+  SYNCING
+  AUTH_EXPIRED
+  FAILED
+}
+
+// ==========================================
+// BLOCO 1: IDENTIDADE E ACESSO (Better Auth)
+// ==========================================
 
 model User {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
-  email         String   @unique
-  emailVerified Boolean  @default(false)
+  email         String    @unique
+  emailVerified Boolean   @default(false)
   image         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  sessions     Session[]
-  accounts     Account[]
-  wallets      Wallet[]
-  categories   Category[]
-  transactions Transaction[]
+  sessions                Session[]
+  accounts                Account[]
+  openFinanceConnections  OpenFinanceConnection[]
+  wallets                 Wallet[]
+  categories              Category[]
+  installmentPlans        InstallmentPlan[]
+  costCenters             CostCenter[]
+  creditCards             CreditCard[]
+  transactions            Transaction[]
+  transfers               Transfer[]
+  budgets                 Budget[]
+  goals                   Goal[]
+  recurringTransactions   RecurringTransaction[]
+  tags                    Tag[]
+  investments             Investment[]
+  netWorthSnapshots       NetWorthSnapshot[]
 
-  @@map("user")
+  @@map("users")
 }
 
 model Session {
   id        String   @id @default(cuid())
   expiresAt DateTime
   token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@map("session")
+  // Índice para listagem de sessões ativas por usuário
+  @@index([userId])
+  @@map("sessions")
 }
 
 model Account {
@@ -56,68 +123,413 @@ model Account {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  @@map("account")
+  // Requerido pelo Better Auth: impede duplicata de conta OAuth por provider
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
 }
 
-model Verification {
-  id         String    @id @default(cuid())
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime? @default(now())
-  updatedAt  DateTime? @updatedAt
+// ==========================================
+// BLOCO 2: AS FONTES DE VALOR
+// ==========================================
 
-  @@map("verification")
+model OpenFinanceConnection {
+  id              String      @id @default(cuid())
+  institutionName String
+  itemId          String
+  status          SyncStatus  @default(OK)
+  lastSyncedAt    DateTime?
+  walletId        String?     @unique
+  wallet          Wallet?     @relation(fields: [walletId], references: [id])
+  creditCardId    String?     @unique
+  creditCard      CreditCard? @relation(fields: [creditCardId], references: [id])
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+
+  // Índice para listar conexões do usuário e filtrar por status para jobs de sincronização
+  @@index([userId])
+  @@index([status])
+  @@index([userId, deletedAt])
+  @@map("open_finance_connections")
 }
-
-// ─── Nummus Models ─────────────────────────────────────────────────────────
 
 model Wallet {
-  id           String        @id @default(uuid())
-  name         String
-  balance      Float         @default(0)
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  createdAt    DateTime      @default(now()) @db.Timestamptz()
-  updatedAt    DateTime      @updatedAt @db.Timestamptz()
+  id             String    @id @default(cuid())
+  name           String
+  currency       String    @default("BRL")
+  initialBalance Decimal   @db.Decimal(12, 2)
+  balance        Decimal   @db.Decimal(12, 2)
+  isArchived     Boolean   @default(false)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
 
+  transactions          Transaction[]
+  goals                 Goal[]
+  recurringTransactions RecurringTransaction[]
+  openFinanceConnection OpenFinanceConnection?
+
+  // Impede carteiras com nome duplicado por usuário
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([userId, deletedAt])
   @@map("wallets")
 }
 
-model Category {
-  id           String        @id @default(uuid())
+model Investment {
+  id           String         @id @default(cuid())
   name         String
-  color        String?
+  ticker       String?
+  type         InvestmentType
+  currency     String         @default("BRL")
+  quantity     Decimal        @db.Decimal(12, 6)
+  averagePrice Decimal        @db.Decimal(12, 2)
+  currentValue Decimal        @db.Decimal(12, 2)
+  institution  String
   userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  createdAt    DateTime      @default(now()) @db.Timestamptz()
-  updatedAt    DateTime      @updatedAt @db.Timestamptz()
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
 
+  logs InvestmentLog[]
+
+  @@index([userId])
+  @@index([userId, type])
+  @@index([userId, deletedAt])
+  @@map("investments")
+}
+
+model InvestmentLog {
+  id           String            @id @default(cuid())
+  type         InvestmentLogType
+  quantity     Decimal           @db.Decimal(12, 6)
+  unitPrice    Decimal           @db.Decimal(12, 2)
+  totalAmount  Decimal           @db.Decimal(12, 2)
+  date         DateTime
+  investmentId String
+  investment   Investment        @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime          @default(now())
+
+  // Índice para histórico do investimento e consultas por período
+  @@index([investmentId])
+  @@index([investmentId, date])
+  @@map("investment_logs")
+}
+
+// ==========================================
+// BLOCO 3: TAXONOMIA E CONTEXTO
+// ==========================================
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  color     String
+  icon      String
+  parentId  String?
+  parent    Category? @relation("CategoryToSubCategory", fields: [parentId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  subCategories         Category[]             @relation("CategoryToSubCategory")
+  transactions          Transaction[]
+  budgets               Budget[]
+  recurringTransactions RecurringTransaction[]
+
+  // Impede categorias com mesmo nome no mesmo nível hierárquico por usuário
+  // Nota: PostgreSQL trata NULL como distinto, então categorias raiz com mesmo nome
+  // precisam de validação adicional na camada de aplicação
+  @@unique([userId, name, parentId])
+  @@index([userId])
+  @@index([userId, parentId])
+  @@index([userId, deletedAt])
   @@map("categories")
 }
 
-enum TransactionType {
-  INCOME
-  EXPENSE
-  TRANSFER
+model CostCenter {
+  id        String    @id @default(cuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  transactions Transaction[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([userId, deletedAt])
+  @@map("cost_centers")
 }
 
-model Transaction {
-  id          String          @id @default(cuid())
-  amount      Decimal         @db.Decimal(12, 2)
-  type        TransactionType
-  date        DateTime
-  description String?
-  walletId    String
-  wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  categoryId  String?
-  category    Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  userId      String
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+model Tag {
+  id        String    @id @default(cuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
 
-  @@map("transaction")
+  transactionTags TransactionTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
+}
+
+model TransactionTag {
+  transactionId String
+  tagId         String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tag           Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([transactionId, tagId])
+  // Índice para consultas inversas: "quais transações têm esta tag?"
+  @@index([tagId])
+  @@map("transaction_tags")
+}
+
+// ==========================================
+// BLOCO 4: O CORAÇÃO TRANSACIONAL
+// ==========================================
+
+// Regra de consistência de paymentMethod (enforçada na camada de aplicação via Zod):
+// paymentMethod = CREDIT_CARD → creditCardId obrigatório, walletId deve ser nulo
+// paymentMethod ≠ CREDIT_CARD → walletId obrigatório, creditCardId deve ser nulo
+model Transaction {
+  id            String            @id @default(cuid())
+  amount        Decimal           @db.Decimal(12, 2)
+  type          TransactionType
+  paymentMethod PaymentMethod
+  status        TransactionStatus @default(COMPLETED)
+  date          DateTime
+  description   String            @db.Text
+
+  walletId     String?
+  wallet       Wallet?    @relation(fields: [walletId], references: [id])
+  creditCardId String?
+  creditCard   CreditCard? @relation(fields: [creditCardId], references: [id])
+  categoryId   String
+  category     Category   @relation(fields: [categoryId], references: [id])
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  installmentPlanId String?
+  installmentPlan   InstallmentPlan?   @relation(fields: [installmentPlanId], references: [id])
+  installmentNumber Int?
+  invoiceId         String?
+  invoice           CreditCardInvoice? @relation(fields: [invoiceId], references: [id])
+  costCenterId      String?
+  costCenter        CostCenter?        @relation(fields: [costCenterId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tags        TransactionTag[]
+  attachments Attachment[]
+
+  transferOut Transfer? @relation("TransferOut")
+  transferIn  Transfer? @relation("TransferIn")
+
+  // Índices cobrindo os padrões de consulta mais frequentes em dashboards financeiros
+  @@index([userId, date])          // listagem por período (mais comum)
+  @@index([userId, type])          // resumo de receitas/despesas
+  @@index([userId, status])        // transações pendentes
+  @@index([userId, deletedAt])     // filtro de soft delete
+  @@index([walletId])              // saldo e extrato por carteira
+  @@index([creditCardId])          // extrato por cartão
+  @@index([categoryId])            // gastos por categoria
+  @@index([invoiceId])             // transações de uma fatura
+  @@index([installmentPlanId])     // parcelas de um plano
+  @@index([date])                  // consultas analíticas por data
+  @@map("transactions")
+}
+
+model Transfer {
+  id               String      @id @default(cuid())
+  description      String?     @db.Text
+  outTransactionId String      @unique
+  outTransaction   Transaction @relation("TransferOut", fields: [outTransactionId], references: [id], onDelete: Cascade)
+  inTransactionId  String      @unique
+  inTransaction    Transaction @relation("TransferIn", fields: [inTransactionId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime    @default(now())
+  deletedAt        DateTime?
+
+  @@index([userId])
+  @@map("transfers")
+}
+
+model RecurringTransaction {
+  id                String             @id @default(cuid())
+  description       String
+  amount            Decimal            @db.Decimal(12, 2)
+  type              TransactionType
+  frequency         RecurringFrequency
+  nextExecutionDate DateTime
+  active            Boolean            @default(true)
+  walletId          String?
+  wallet            Wallet?            @relation(fields: [walletId], references: [id])
+  categoryId        String
+  category          Category           @relation(fields: [categoryId], references: [id])
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  // Índice para o job do scheduler que busca transações a executar
+  @@index([nextExecutionDate])
+  @@index([userId, active])
+  @@index([userId, deletedAt])
+  @@map("recurring_transactions")
+}
+
+model Attachment {
+  id            String      @id @default(cuid())
+  fileName      String
+  fileUrl       String      @db.Text
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+  @@map("attachments")
+}
+
+// ==========================================
+// BLOCO 5: MÁQUINAS DO TEMPO DE DÍVIDA
+// ==========================================
+
+model CreditCard {
+  id         String    @id @default(cuid())
+  name       String
+  limit      Decimal   @db.Decimal(12, 2)
+  closingDay Int
+  dueDay     Int
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  invoices              CreditCardInvoice[]
+  transactions          Transaction[]
+  openFinanceConnection OpenFinanceConnection?
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([userId, deletedAt])
+  @@map("credit_cards")
+}
+
+model CreditCardInvoice {
+  id              String     @id @default(cuid())
+  periodStartDate DateTime
+  periodEndDate   DateTime
+  dueDate         DateTime
+  totalAmount     Decimal    @db.Decimal(12, 2)
+  paid            Boolean    @default(false)
+  creditCardId    String
+  creditCard      CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
+
+  transactions Transaction[]
+
+  // Impede faturas duplicadas para o mesmo período do mesmo cartão
+  @@unique([creditCardId, periodStartDate, periodEndDate])
+  @@index([creditCardId])
+  @@index([creditCardId, paid])  // faturas pendentes de pagamento
+  @@index([dueDate])             // alertas de vencimento
+  @@map("credit_card_invoices")
+}
+
+model InstallmentPlan {
+  id                String    @id @default(cuid())
+  description       String
+  totalAmount       Decimal   @db.Decimal(12, 2)
+  totalInstallments Int
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+  @@map("installment_plans")
+}
+
+// ==========================================
+// BLOCO 6: INTELIGÊNCIA E ACUMULAÇÃO
+// ==========================================
+
+model Budget {
+  id          String    @id @default(cuid())
+  month       Int
+  year        Int
+  limitAmount Decimal   @db.Decimal(12, 2)
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  // Impede orçamentos duplicados para a mesma categoria no mesmo mês/ano
+  @@unique([userId, categoryId, month, year])
+  @@index([userId])
+  @@index([userId, year, month])
+  @@index([userId, deletedAt])
+  @@map("budgets")
+}
+
+model Goal {
+  id            String    @id @default(cuid())
+  name          String
+  targetAmount  Decimal   @db.Decimal(12, 2)
+  currentAmount Decimal   @db.Decimal(12, 2)
+  targetDate    DateTime
+  walletId      String?
+  wallet        Wallet?   @relation(fields: [walletId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+  @@map("goals")
+}
+
+model NetWorthSnapshot {
+  id               String   @id @default(cuid())
+  date             DateTime
+  totalAssets      Decimal  @db.Decimal(12, 2)
+  totalLiabilities Decimal  @db.Decimal(12, 2)
+  netWorth         Decimal  @db.Decimal(12, 2)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+
+  // Garante apenas um snapshot por dia por usuário; o @@unique já serve como índice
+  @@unique([userId, date])
+  @@map("net_worth_snapshots")
 }

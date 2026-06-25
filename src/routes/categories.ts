@@ -30,7 +30,7 @@ export const categoryRoutes = async (app: FastifyInstance) => {
       const userId = "id-do-usuario-logado";
       const category = await createCategory({
         name: request.body.name,
-        color: request.body.color ?? null,
+        ...(request.body.color !== undefined ? { color: request.body.color } : {}),
         userId,
       });
       return reply.status(201).send(category);

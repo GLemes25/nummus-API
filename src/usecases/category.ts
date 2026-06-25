@@ -1,16 +1,17 @@
 import { prisma } from "../lib/prisma.js";
 
-interface CreateCategoryInput {
+type CreateCategoryInput = {
   name: string;
-  color: string | null;
+  color?: string;
   userId: string;
-}
+};
 
 export const createCategory = async (data: CreateCategoryInput) => {
   return prisma.category.create({
     data: {
       name: data.name,
-      color: data.color,
+      color: data.color ?? "#6B7280",
+      icon: "tag",
       userId: data.userId,
     },
   });
