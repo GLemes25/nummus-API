@@ -11,12 +11,9 @@ import {
 } from "fastify-type-provider-zod";
 import { z } from "zod";
 
-import { auth } from "../../lib/auth.js";
-import { env } from "../../lib/env.js";
+import { auth } from "../lib/auth.js";
+import { env } from "../lib/env.js";
 import { walletRoutes } from "../../modules/wallets/http/wallet.routes.js";
-import { categoryRoutes } from "../../routes/categories.js";
-import { transactionRoutes } from "../../routes/transactions.js";
-import { userRoutes } from "../../routes/users.js";
 
 const envToLogger = {
   development: {
@@ -73,9 +70,6 @@ export const buildApp = async () => {
   });
 
   await app.register(walletRoutes, { prefix: "/wallets" });
-  await app.register(transactionRoutes, { prefix: "/transactions" });
-  await app.register(categoryRoutes, { prefix: "/categories" });
-  await app.register(userRoutes, { prefix: "/users" });
 
   app.withTypeProvider<ZodTypeProvider>().route({
     method: "GET",

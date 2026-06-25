@@ -1,0 +1,343 @@
+Enum transaction_type {
+  INCOME
+  EXPENSE
+  BALANCE_ADJUSTMENT
+}
+
+Enum payment_method {
+  CASH
+  PIX
+  BANK_TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+}
+
+Enum transaction_status {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+Enum recurring_frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+Enum investment_type {
+  FIXED_INCOME
+  VARIABLE_INCOME
+  CRYPTO
+  REAL_ESTATE
+  MULTIMARKET
+}
+
+Enum investment_log_type {
+  BUY
+  SELL
+  YIELD
+}
+
+Enum sync_status {
+  OK
+  SYNCING
+  AUTH_EXPIRED
+  FAILED
+}
+
+Table users {
+  id string [pk]
+  name string
+  email string [unique]
+  emailVerified boolean
+  image string [null]
+  createdAt datetime
+  updatedAt datetime
+}
+
+Table sessions {
+  id string [pk]
+  expiresAt datetime
+  token string [unique]
+  createdAt datetime
+  updatedAt datetime
+  ipAddress string [null]
+  userAgent string [null]
+  userId string
+}
+
+Table accounts {
+  id string [pk]
+  accountId string
+  providerId string
+  userId string
+  accessToken string [null]
+  refreshToken string [null]
+  idToken string [null]
+  accessTokenExpiresAt datetime [null]
+  refreshTokenExpiresAt datetime [null]
+  scope string [null]
+  password string [null]
+  createdAt datetime
+  updatedAt datetime
+}
+
+Table open_finance_connections {
+  id string [pk]
+  institutionName varchar
+  itemId string [note: 'ID na API parceira, ex: Pluggy/Belvo']
+  status sync_status [default: 'OK']
+  lastSyncedAt datetime
+  walletId string [null, note: 'Vinculado a uma conta corrente']
+  creditCardId string [null, note: 'Vinculado a um cartão']
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table wallets {
+  id string [pk]
+  name string
+  currency varchar [default: 'BRL']
+  initialBalance decimal [note: 'Apenas para histórico visual']
+  balance decimal [note: 'Cache materializado do saldo atual']
+  isArchived boolean [default: false]
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table categories {
+  id string [pk]
+  name string
+  color string
+  icon string
+  parentId string [null, note: 'Permite subcategorias: Alimentação -> Mercado']
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table installment_plans {
+  id string [pk]
+  description varchar
+  totalAmount decimal
+  totalInstallments int
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table cost_centers {
+  id string [pk]
+  name varchar
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table credit_cards {
+  id string [pk]
+  name varchar
+  limit decimal
+  closingDay int
+  dueDay int
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table credit_card_invoices {
+  id string [pk]
+  periodStartDate datetime
+  periodEndDate datetime
+  dueDate datetime
+  totalAmount decimal
+  paid boolean [default: false]
+  creditCardId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table transactions {
+  id string [pk]
+  amount decimal
+  type transaction_type
+  paymentMethod payment_method
+  status transaction_status [default: 'COMPLETED']
+  date datetime
+  description text
+  
+  // Chaves estrangeiras principais
+  walletId string [null, note: 'Obrigatório se não for compra no Cartão de Crédito']
+  creditCardId string [null, note: 'Obrigatório se paymentMethod == CREDIT_CARD']
+  categoryId string
+  userId string
+  
+  // Chaves estrangeiras opcionais
+  installmentPlanId string [null]
+  installmentNumber int [null, note: 'Ex: 3 (referente à 3ª parcela)']
+  invoiceId string [null]
+  costCenterId string [null]
+  
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table transfers {
+  id string [pk]
+  description text
+  outTransactionId string [note: 'ID da transação de Despesa na carteira de origem']
+  inTransactionId string [note: 'ID da transação de Receita na carteira de destino']
+  userId string
+  createdAt datetime
+  deletedAt datetime [null]
+}
+
+Table budgets {
+  id string [pk]
+  month int
+  year int
+  limitAmount decimal
+  categoryId string
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table goals {
+  id string [pk]
+  name varchar
+  targetAmount decimal
+  currentAmount decimal
+  targetDate datetime
+  walletId string [null, note: 'O pote real onde o dinheiro está guardado']
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table recurring_transactions {
+  id string [pk]
+  description varchar
+  amount decimal
+  type transaction_type
+  frequency recurring_frequency
+  nextExecutionDate datetime
+  active boolean [default: true]
+  walletId string
+  categoryId string
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table tags {
+  id string [pk]
+  name varchar
+  userId string
+  createdAt datetime
+}
+
+Table transaction_tags {
+  transactionId string
+  tagId string
+}
+
+Table attachments {
+  id string [pk]
+  fileName varchar
+  fileUrl text
+  transactionId string
+  createdAt datetime
+}
+
+Table investments {
+  id string [pk]
+  name varchar
+  ticker varchar [null, note: 'Ex: IVVB11, AAPL']
+  type investment_type
+  currency varchar [default: 'BRL']
+  quantity decimal [note: 'Número de cotas']
+  averagePrice decimal [note: 'Preço médio pago']
+  currentValue decimal [note: 'Valor de mercado hoje']
+  institution varchar
+  userId string
+  createdAt datetime
+  updatedAt datetime
+  deletedAt datetime [null]
+}
+
+Table investment_logs {
+  id string [pk]
+  type investment_log_type
+  quantity decimal
+  unitPrice decimal
+  totalAmount decimal
+  date datetime
+  investmentId string
+  createdAt datetime
+}
+
+Table net_worth_snapshots {
+  id string [pk]
+  date datetime
+  totalAssets decimal [note: 'Soma de Wallets (+) + Investments (+)']
+  totalLiabilities decimal [note: 'Soma de Invoices abertas (-) + Empréstimos']
+  netWorth decimal [note: 'Assets - Liabilities']
+  userId string
+  createdAt datetime
+  
+  indexes {
+    (userId, date) [unique]
+  }
+}
+
+Ref: sessions.userId > users.id
+Ref: accounts.userId > users.id
+Ref: open_finance_connections.userId > users.id
+Ref: open_finance_connections.walletId > wallets.id
+Ref: open_finance_connections.creditCardId > credit_cards.id
+Ref: wallets.userId > users.id
+Ref: categories.userId > users.id
+Ref: categories.parentId > categories.id
+Ref: installment_plans.userId > users.id
+Ref: cost_centers.userId > users.id
+Ref: credit_cards.userId > users.id
+Ref: credit_card_invoices.creditCardId > credit_cards.id
+Ref: transactions.userId > users.id
+Ref: transactions.walletId > wallets.id
+Ref: transactions.creditCardId > credit_cards.id
+Ref: transactions.categoryId > categories.id
+Ref: transactions.installmentPlanId > installment_plans.id
+Ref: transactions.invoiceId > credit_card_invoices.id
+Ref: transactions.costCenterId > cost_centers.id
+Ref: transfers.userId > users.id
+Ref: transfers.outTransactionId - transactions.id
+Ref: transfers.inTransactionId - transactions.id
+Ref: budgets.userId > users.id
+Ref: budgets.categoryId > categories.id
+Ref: goals.userId > users.id
+Ref: goals.walletId > wallets.id
+Ref: recurring_transactions.userId > users.id
+Ref: recurring_transactions.walletId > wallets.id
+Ref: recurring_transactions.categoryId > categories.id
+Ref: tags.userId > users.id
+Ref: transaction_tags.transactionId > transactions.id
+Ref: transaction_tags.tagId > tags.id
+Ref: attachments.transactionId > transactions.id
+Ref: investments.userId > users.id
+Ref: investment_logs.investmentId > investments.id
+Ref: net_worth_snapshots.userId > users.id

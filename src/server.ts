@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-import { env } from "./lib/env.js";
+import { env } from "./shared/lib/env.js";
 import { buildApp } from "./shared/http/server.js";
 
 const app = await buildApp();
