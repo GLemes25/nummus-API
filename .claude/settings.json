@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nc -zv ep-super-rain-acnd01yo-pooler.sa-east-1.aws.neon.tech 5432)",
+      "Bash(nc -zv ep-super-rain-acnd01yo.sa-east-1.aws.neon.tech 5432)"
+    ]
+  }
+}
