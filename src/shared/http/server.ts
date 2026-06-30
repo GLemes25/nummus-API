@@ -3,6 +3,7 @@ import fastifySwagger from "@fastify/swagger";
 import fastifyApiReference from "@scalar/fastify-api-reference";
 import Fastify from "fastify";
 import {
+  hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
   jsonSchemaTransformObject,
   serializerCompiler,
@@ -31,6 +32,18 @@ export const buildApp = async () => {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (hasZodFastifySchemaValidationErrors(error)) {
+      return reply.status(400).send({
+        error: "Validation Error",
+        issues: error.validation,
+      });
+    }
+
+    console.error(error);
+    return reply.status(500).send({ error: "Internal Server Error" });
+  });
 
   await app.register(fastifySwagger, {
     openapi: {
