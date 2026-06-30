@@ -1,3 +1,4 @@
+import { makeAppError } from "../../../shared/errors/make-app-error.js";
 import type { tagRepository } from "../repositories/tag.repository.js";
 import type { CreateTagDto } from "../dtos/create-tag.dto.js";
 
@@ -9,7 +10,11 @@ export const makeCreateTagUseCase = (repository: TagRepository) => {
     const existing = await repository.findByNameAndUser(data.userId, data.name);
 
     if (existing) {
-      throw new Error("A tag with this name already exists");
+      throw makeAppError({
+        code: "TAG_ALREADY_EXISTS",
+        message: "Já existe uma tag com este nome",
+        statusCode: 409,
+      });
     }
 
     return repository.create(data);
