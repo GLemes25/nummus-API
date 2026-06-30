@@ -21,9 +21,13 @@ export const walletRepository = {
     return prisma.wallet.findFirst({ where: { id, deletedAt: null } });
   },
 
-  findManyByUser: async (userId: string) => {
+  findManyByUser: async (userId: string, isArchived?: boolean) => {
     return prisma.wallet.findMany({
-      where: { userId, deletedAt: null },
+      where: {
+        userId,
+        deletedAt: null,
+        ...(isArchived !== undefined ? { isArchived } : {}),
+      },
       orderBy: { createdAt: "desc" },
     });
   },

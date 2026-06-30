@@ -8,6 +8,15 @@ export const createWalletSchema = z.object({
 
 export type CreateWalletDto = z.infer<typeof createWalletSchema>;
 
+export const getWalletsSchema = z.object({
+  isArchived: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+});
+
+export type GetWalletsDto = z.infer<typeof getWalletsSchema>;
+
 export const walletResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
