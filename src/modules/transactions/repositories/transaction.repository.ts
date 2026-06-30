@@ -25,7 +25,56 @@ type CreateWithInvoiceData = {
   dueDate: Date;
 };
 
+type FindManyPaginatedInput = {
+  userId: string;
+  page: number;
+  limit: number;
+  startDate?: Date;
+  endDate?: Date;
+  walletId?: string;
+  categoryId?: string;
+  type?: "INCOME" | "EXPENSE" | "BALANCE_ADJUSTMENT";
+};
+
 export const transactionRepository = {
+  findById: async (id: string) => {
+    return prisma.transaction.findFirst({ where: { id, deletedAt: null } });
+  },
+
+  findManyPaginated: async (filters: FindManyPaginatedInput) => {
+    const { userId, page, limit, startDate, endDate, walletId, categoryId, type } = filters;
+    const skip = (page - 1) * limit;
+
+    const dateFilter: { gte?: Date; lte?: Date } = {};
+    if (startDate) dateFilter.gte = startDate;
+    if (endDate) dateFilter.lte = endDate;
+
+    const where = {
+      userId,
+      deletedAt: null,
+      ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
+      ...(walletId ? { walletId } : {}),
+      ...(categoryId ? { categoryId } : {}),
+      ...(type ? { type } : {}),
+    };
+
+    const [data, totalCount] = await prisma.$transaction([
+      prisma.transaction.findMany({
+        where,
+        include: {
+          category: { select: { id: true, name: true, color: true, icon: true } },
+          wallet: { select: { id: true, name: true, currency: true } },
+        },
+        orderBy: { date: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.transaction.count({ where }),
+    ]);
+
+    return { data, totalCount };
+  },
+
   createWithBalanceUpdate: async (data: CreateTransactionData) => {
     return prisma.$transaction(async (tx) => {
       const transaction = await tx.transaction.create({
@@ -48,6 +97,34 @@ export const transactionRepository = {
       });
 
       return transaction;
+    });
+  },
+
+  softDeleteWithReversal: async (transactionId: string, userId: string) => {
+    await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.findFirst({
+        where: { id: transactionId, deletedAt: null },
+      });
+
+      if (!transaction) throw new Error("Transaction not found");
+      if (transaction.userId !== userId) throw new Error("Transaction not found");
+
+      await tx.transaction.update({
+        where: { id: transactionId },
+        data: { deletedAt: new Date() },
+      });
+
+      if (transaction.walletId && (transaction.type === "INCOME" || transaction.type === "EXPENSE")) {
+        const balanceDelta =
+          transaction.type === "INCOME"
+            ? -Number(transaction.amount)
+            : Number(transaction.amount);
+
+        await tx.wallet.update({
+          where: { id: transaction.walletId },
+          data: { balance: { increment: balanceDelta } },
+        });
+      }
     });
   },
 
