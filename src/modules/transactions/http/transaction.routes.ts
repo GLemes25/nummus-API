@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 
 import { verifyAuth } from "../../../shared/http/hooks/verify-auth.js";
+import { appErrorResponseSchema } from "../../../shared/errors/make-app-error.js";
 import { createTransactionSchema, transactionResponseSchema } from "../dtos/create-transaction.dto.js";
 import { getTransactionsSchema, getTransactionsResponseSchema } from "../dtos/get-transactions.dto.js";
 import { transactionRepository } from "../repositories/transaction.repository.js";
@@ -80,19 +81,12 @@ export const transactionRoutes =
         params: z.object({ id: z.string() }),
         response: {
           204: z.void(),
-          404: z.object({ error: z.string() }),
+          404: appErrorResponseSchema,
         },
       },
       handler: async (request, reply) => {
-        try {
-          await deleteTransaction({ transactionId: request.params.id, userId: request.userId });
-          return reply.status(204).send();
-        } catch (error) {
-          if (error instanceof Error && error.message === "Transaction not found") {
-            return reply.status(404).send({ error: "Transaction not found" });
-          }
-          throw error;
-        }
+        await deleteTransaction({ transactionId: request.params.id, userId: request.userId });
+        return reply.status(204).send();
       },
     });
   };
