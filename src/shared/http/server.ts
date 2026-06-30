@@ -3,7 +3,6 @@ import fastifySwagger from "@fastify/swagger";
 import fastifyApiReference from "@scalar/fastify-api-reference";
 import Fastify from "fastify";
 import {
-  hasZodFastifySchemaValidationErrors,
   jsonSchemaTransform,
   jsonSchemaTransformObject,
   serializerCompiler,
@@ -14,6 +13,7 @@ import { z } from "zod";
 
 import { auth } from "../lib/auth.js";
 import { env } from "../lib/env.js";
+import { errorHandler } from "./error-handler.js";
 import { categoryRoutes } from "../../modules/categories/http/category.routes.js";
 import { categoryRepository } from "../../modules/categories/repositories/category.repository.js";
 import { costCenterRoutes } from "../../modules/cost-centers/http/cost-center.routes.js";
@@ -42,17 +42,7 @@ export const buildApp = async () => {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  app.setErrorHandler((error, _request, reply) => {
-    if (hasZodFastifySchemaValidationErrors(error)) {
-      return reply.status(400).send({
-        error: "Validation Error",
-        issues: error.validation,
-      });
-    }
-
-    console.error(error);
-    return reply.status(500).send({ error: "Internal Server Error" });
-  });
+  app.setErrorHandler(errorHandler);
 
   await app.register(fastifySwagger, {
     openapi: {
