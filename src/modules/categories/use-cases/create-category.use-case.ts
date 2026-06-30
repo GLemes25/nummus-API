@@ -1,3 +1,4 @@
+import { makeAppError } from "../../../shared/errors/make-app-error.js";
 import type { categoryRepository } from "../repositories/category.repository.js";
 import type { CreateCategoryDto } from "../dtos/create-category.dto.js";
 
@@ -13,7 +14,11 @@ export const makeCreateCategoryUseCase = (repository: CategoryRepository) => {
     );
 
     if (existing) {
-      throw new Error("A category with this name already exists at this level");
+      throw makeAppError({
+        code: "CATEGORY_ALREADY_EXISTS",
+        message: "Já existe uma categoria com este nome neste nível",
+        statusCode: 409,
+      });
     }
 
     return repository.create(data);
