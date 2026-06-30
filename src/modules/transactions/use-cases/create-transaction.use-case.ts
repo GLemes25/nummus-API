@@ -1,3 +1,4 @@
+import { makeAppError } from "../../../shared/errors/make-app-error.js";
 import type { transactionRepository } from "../repositories/transaction.repository.js";
 import type { CreateTransactionDto } from "../dtos/create-transaction.dto.js";
 
@@ -39,11 +40,23 @@ export const makeCreateTransactionUseCase = (
 ) => {
   return async (data: CreateTransactionInput) => {
     const category = await findCategory(data.categoryId);
-    if (!category) throw new Error("Category not found");
+    if (!category) {
+      throw makeAppError({
+        code: "CATEGORY_NOT_FOUND",
+        message: "Categoria não encontrada",
+        statusCode: 404,
+      });
+    }
 
     if (data.paymentMethod === "CREDIT_CARD") {
       const creditCard = await findCreditCard(data.creditCardId!);
-      if (!creditCard) throw new Error("Credit card not found");
+      if (!creditCard) {
+        throw makeAppError({
+          code: "CREDIT_CARD_NOT_FOUND",
+          message: "Cartão de crédito não encontrado",
+          statusCode: 404,
+        });
+      }
 
       const { periodStart, periodEnd, dueDate } = computeInvoicePeriod(
         data.date,
@@ -66,7 +79,13 @@ export const makeCreateTransactionUseCase = (
     }
 
     const wallet = await findWallet(data.walletId!);
-    if (!wallet) throw new Error("Wallet not found");
+    if (!wallet) {
+      throw makeAppError({
+        code: "WALLET_NOT_FOUND",
+        message: "Carteira não encontrada",
+        statusCode: 404,
+      });
+    }
 
     const currentBalance = wallet.balance.toNumber();
     let storedAmount: number;

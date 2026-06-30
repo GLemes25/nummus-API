@@ -1,4 +1,5 @@
 import { prisma } from "../../../shared/lib/prisma.js";
+import { makeAppError } from "../../../shared/errors/make-app-error.js";
 
 type CreateTransactionData = {
   storedAmount: number;
@@ -106,8 +107,13 @@ export const transactionRepository = {
         where: { id: transactionId, deletedAt: null },
       });
 
-      if (!transaction) throw new Error("Transaction not found");
-      if (transaction.userId !== userId) throw new Error("Transaction not found");
+      if (!transaction || transaction.userId !== userId) {
+        throw makeAppError({
+          code: "TRANSACTION_NOT_FOUND",
+          message: "Transação não encontrada",
+          statusCode: 404,
+        });
+      }
 
       await tx.transaction.update({
         where: { id: transactionId },
