@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 export const createTagSchema = z.object({
-  name: z.string().min(1),
+  name: z
+    .string({ error: "O nome da tag é obrigatório" })
+    .min(1, "O nome da tag é obrigatório"),
 });
 
 export type CreateTagDto = z.infer<typeof createTagSchema>;
