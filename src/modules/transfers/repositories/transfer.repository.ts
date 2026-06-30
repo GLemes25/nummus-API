@@ -1,4 +1,5 @@
 import { prisma } from "../../../shared/lib/prisma.js";
+import { makeAppError } from "../../../shared/errors/make-app-error.js";
 
 type CreateTransferInput = {
   sourceWalletId: string;
@@ -16,12 +17,24 @@ export const transferRepository = {
       const sourceWallet = await tx.wallet.findFirst({
         where: { id: data.sourceWalletId, userId: data.userId, deletedAt: null },
       });
-      if (!sourceWallet) throw new Error("Source wallet not found");
+      if (!sourceWallet) {
+        throw makeAppError({
+          code: "SOURCE_WALLET_NOT_FOUND",
+          message: "Carteira de origem não encontrada",
+          statusCode: 404,
+        });
+      }
 
       const destinationWallet = await tx.wallet.findFirst({
         where: { id: data.destinationWalletId, userId: data.userId, deletedAt: null },
       });
-      if (!destinationWallet) throw new Error("Destination wallet not found");
+      if (!destinationWallet) {
+        throw makeAppError({
+          code: "DESTINATION_WALLET_NOT_FOUND",
+          message: "Carteira de destino não encontrada",
+          statusCode: 404,
+        });
+      }
 
       const outTransaction = await tx.transaction.create({
         data: {

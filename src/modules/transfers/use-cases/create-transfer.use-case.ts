@@ -1,3 +1,4 @@
+import { makeAppError } from "../../../shared/errors/make-app-error.js";
 import type { transferRepository } from "../repositories/transfer.repository.js";
 import type { CreateTransferDto } from "../dtos/create-transfer.dto.js";
 
@@ -8,7 +9,10 @@ type CreateTransferInput = CreateTransferDto & { userId: string };
 export const makeCreateTransferUseCase = (repository: TransferRepository) => {
   return async (data: CreateTransferInput) => {
     if (data.sourceWalletId === data.destinationWalletId) {
-      throw new Error("Source and destination wallets cannot be the same");
+      throw makeAppError({
+        code: "SAME_SOURCE_AND_DESTINATION_WALLET",
+        message: "A carteira de origem e a carteira de destino não podem ser as mesmas",
+      });
     }
 
     return repository.create({
