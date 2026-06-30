@@ -11,6 +11,7 @@ export const presentTransaction = (transaction: Transaction): TransactionRespons
   date: transaction.date,
   description: transaction.description,
   walletId: transaction.walletId,
+  creditCardId: transaction.creditCardId,
   categoryId: transaction.categoryId,
   userId: transaction.userId,
   createdAt: transaction.createdAt,

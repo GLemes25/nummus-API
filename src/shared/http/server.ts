@@ -17,6 +17,8 @@ import { env } from "../lib/env.js";
 import { categoryRoutes } from "../../modules/categories/http/category.routes.js";
 import { categoryRepository } from "../../modules/categories/repositories/category.repository.js";
 import { costCenterRoutes } from "../../modules/cost-centers/http/cost-center.routes.js";
+import { creditCardRoutes } from "../../modules/credit-cards/http/credit-card.routes.js";
+import { creditCardRepository } from "../../modules/credit-cards/repositories/credit-card.repository.js";
 import { tagRoutes } from "../../modules/tags/http/tag.routes.js";
 import { transactionRoutes } from "../../modules/transactions/http/transaction.routes.js";
 import { walletRoutes } from "../../modules/wallets/http/wallet.routes.js";
@@ -92,10 +94,12 @@ export const buildApp = async () => {
   await app.register(categoryRoutes, { prefix: "/categories" });
   await app.register(costCenterRoutes, { prefix: "/cost-centers" });
   await app.register(tagRoutes, { prefix: "/tags" });
+  await app.register(creditCardRoutes, { prefix: "/credit-cards" });
   await app.register(
     transactionRoutes({
       findWallet: walletRepository.findById,
       findCategory: categoryRepository.findById,
+      findCreditCard: creditCardRepository.findById,
     }),
     { prefix: "/transactions" }
   );

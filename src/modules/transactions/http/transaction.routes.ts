@@ -9,10 +9,12 @@ import { presentTransaction } from "./presenters/transaction.presenter.js";
 
 type FindWallet = (id: string) => Promise<{ balance: { toNumber: () => number } } | null>;
 type FindCategory = (id: string) => Promise<{ id: string } | null>;
+type FindCreditCard = (id: string) => Promise<{ id: string; closingDay: number; dueDay: number } | null>;
 
 type TransactionRouteDeps = {
   findWallet: FindWallet;
   findCategory: FindCategory;
+  findCreditCard: FindCreditCard;
 };
 
 export const transactionRoutes =
@@ -20,7 +22,8 @@ export const transactionRoutes =
     const createTransaction = makeCreateTransactionUseCase(
       transactionRepository,
       deps.findWallet,
-      deps.findCategory
+      deps.findCategory,
+      deps.findCreditCard
     );
 
     app.withTypeProvider<ZodTypeProvider>().route({
