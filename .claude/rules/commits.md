@@ -39,7 +39,16 @@ Use estes commits passados do repositório como seu padrão de tom e estrutura:
 
 ## 5. Fluxo de Execução
 
-1. Analise brevemente os arquivos modificados (adicione-os ao _stage_ com `git add .` sempre).
+1. Analise brevemente os arquivos modificados (adicione-os ao _stage_ com `git add .` sempre, exceto quando a Regra 6 exigir _stage_ seletivo por commit).
 2. Gere a mensagem de commit apropriada silenciosamente em inglês.
 3. Execute automaticamente o comando do git: `git commit -m "<mensagem_gerada>"`
 4. Exiba uma breve confirmação de sucesso mostrando a mensagem que foi commitada.
+
+## 6. Granularidade e Separação dos Commits
+
+- **Destrinche ao máximo**: Sempre que uma tarefa gerar múltiplas alterações, **NUNCA** agrupe tudo em um único commit. Separe por **funcionalidade**, **módulo de domínio** e **camada** (DTO, use case, repository, rota), mesmo que isso gere muitos commits pequenos.
+- **Testes em commits próprios**: Alterações em `tests/` (specs, factories, repositórios em memória, configuração do test runner) **NUNCA** entram no mesmo commit que o código de produção que elas testam. Use sempre um commit `test:` separado.
+- **Um módulo por commit**: Ao alterar vários módulos de domínio (ex: `wallets`, `transactions`, `transfers`) na mesma tarefa, crie um commit individual por módulo — nunca um commit "guarda-chuva" cobrindo vários módulos de uma vez.
+- **Feature nova vs correção**: Separe commits que adicionam algo novo (`feat`) de commits que corrigem ou refatoram algo já existente (`fix`/`refactor`), mesmo que pertençam à mesma tarefa ou objetivo maior.
+- **Configuração e dependências à parte**: Mudanças em `package.json`, `pnpm-lock.yaml`, `tsconfig.json` ou outras configurações de ferramentas vão em commits `chore`/`fix` isolados, nunca junto de mudanças de código de negócio ou de testes.
+- **Stage seletivo**: Quando um único arquivo (ex: `package.json`) misturar alterações de naturezas diferentes (ex: dependências de teste + script de build), use _stage_ parcial (por hunk ou reescrevendo o arquivo por etapas) para que cada commit reflita apenas uma intenção.
