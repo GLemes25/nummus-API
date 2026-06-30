@@ -21,6 +21,7 @@ import { creditCardRoutes } from "../../modules/credit-cards/http/credit-card.ro
 import { creditCardRepository } from "../../modules/credit-cards/repositories/credit-card.repository.js";
 import { tagRoutes } from "../../modules/tags/http/tag.routes.js";
 import { transactionRoutes } from "../../modules/transactions/http/transaction.routes.js";
+import { transferRoutes } from "../../modules/transfers/http/transfer.routes.js";
 import { walletRoutes } from "../../modules/wallets/http/wallet.routes.js";
 import { walletRepository } from "../../modules/wallets/repositories/wallet.repository.js";
 
@@ -95,6 +96,7 @@ export const buildApp = async () => {
   await app.register(costCenterRoutes, { prefix: "/cost-centers" });
   await app.register(tagRoutes, { prefix: "/tags" });
   await app.register(creditCardRoutes, { prefix: "/credit-cards" });
+  await app.register(transferRoutes, { prefix: "/transfers" });
   await app.register(
     transactionRoutes({
       findWallet: walletRepository.findById,
