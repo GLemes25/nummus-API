@@ -1,10 +1,16 @@
 import { z } from "zod";
 
 export const createCategorySchema = z.object({
-  name: z.string().min(1),
-  color: z.string().min(1),
-  icon: z.string().min(1),
-  parentId: z.string().optional(),
+  name: z
+    .string({ error: "O nome da categoria é obrigatório" })
+    .min(1, "O nome da categoria é obrigatório"),
+  color: z
+    .string({ error: "A cor da categoria é obrigatória" })
+    .min(1, "A cor da categoria é obrigatória"),
+  icon: z
+    .string({ error: "O ícone da categoria é obrigatório" })
+    .min(1, "O ícone da categoria é obrigatório"),
+  parentId: z.string({ error: "O identificador da categoria pai é inválido" }).optional(),
 });
 
 export type CreateCategoryDto = z.infer<typeof createCategorySchema>;
