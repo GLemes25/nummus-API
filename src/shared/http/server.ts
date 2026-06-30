@@ -14,7 +14,13 @@ import { z } from "zod";
 
 import { auth } from "../lib/auth.js";
 import { env } from "../lib/env.js";
+import { categoryRoutes } from "../../modules/categories/http/category.routes.js";
+import { categoryRepository } from "../../modules/categories/repositories/category.repository.js";
+import { costCenterRoutes } from "../../modules/cost-centers/http/cost-center.routes.js";
+import { tagRoutes } from "../../modules/tags/http/tag.routes.js";
+import { transactionRoutes } from "../../modules/transactions/http/transaction.routes.js";
 import { walletRoutes } from "../../modules/wallets/http/wallet.routes.js";
+import { walletRepository } from "../../modules/wallets/repositories/wallet.repository.js";
 
 const envToLogger = {
   development: {
@@ -83,6 +89,16 @@ export const buildApp = async () => {
   });
 
   await app.register(walletRoutes, { prefix: "/wallets" });
+  await app.register(categoryRoutes, { prefix: "/categories" });
+  await app.register(costCenterRoutes, { prefix: "/cost-centers" });
+  await app.register(tagRoutes, { prefix: "/tags" });
+  await app.register(
+    transactionRoutes({
+      findWallet: walletRepository.findById,
+      findCategory: categoryRepository.findById,
+    }),
+    { prefix: "/transactions" }
+  );
 
   app.withTypeProvider<ZodTypeProvider>().route({
     method: "GET",

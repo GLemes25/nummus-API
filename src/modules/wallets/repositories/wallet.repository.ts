@@ -17,6 +17,10 @@ export const walletRepository = {
     });
   },
 
+  findById: async (id: string) => {
+    return prisma.wallet.findFirst({ where: { id, deletedAt: null } });
+  },
+
   findManyByUser: async (userId: string) => {
     return prisma.wallet.findMany({
       where: { userId, deletedAt: null },
