@@ -19,6 +19,13 @@ export const categoryRepository = {
     return prisma.category.findFirst({ where: { id, deletedAt: null } });
   },
 
+  findManyByUser: async (userId: string) => {
+    return prisma.category.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: { name: "asc" },
+    });
+  },
+
   create: async (data: CreateCategoryInput) => {
     return prisma.category.create({
       data: {
