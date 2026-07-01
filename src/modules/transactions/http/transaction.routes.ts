@@ -81,6 +81,7 @@ export const transactionRoutes =
         params: z.object({ id: z.string() }),
         response: {
           204: z.void(),
+          403: appErrorResponseSchema,
           404: appErrorResponseSchema,
         },
       },
