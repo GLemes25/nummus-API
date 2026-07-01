@@ -1,5 +1,4 @@
 import { prisma } from "../../../shared/lib/prisma.js";
-import { makeAppError } from "../../../shared/errors/make-app-error.js";
 
 type CreateTransactionData = {
   storedAmount: number;
@@ -39,7 +38,7 @@ type FindManyPaginatedInput = {
 
 export const transactionRepository = {
   findById: async (id: string) => {
-    return prisma.transaction.findFirst({ where: { id, deletedAt: null } });
+    return prisma.transaction.findFirst({ where: { id } });
   },
 
   findManyPaginated: async (filters: FindManyPaginatedInput) => {
@@ -101,26 +100,20 @@ export const transactionRepository = {
     });
   },
 
-  softDeleteWithReversal: async (transactionId: string, userId: string) => {
+  softDeleteWithReversal: async (transactionId: string) => {
     await prisma.$transaction(async (tx) => {
-      const transaction = await tx.transaction.findFirst({
+      const { count } = await tx.transaction.updateMany({
         where: { id: transactionId, deletedAt: null },
-      });
-
-      if (!transaction || transaction.userId !== userId) {
-        throw makeAppError({
-          code: "TRANSACTION_NOT_FOUND",
-          message: "Transação não encontrada",
-          statusCode: 404,
-        });
-      }
-
-      await tx.transaction.update({
-        where: { id: transactionId },
         data: { deletedAt: new Date() },
       });
 
-      if (transaction.walletId && (transaction.type === "INCOME" || transaction.type === "EXPENSE")) {
+      // Guarda atômica: se nada foi atualizado, a transação já estava
+      // deletada (execução concorrente) e o saldo não deve ser revertido de novo.
+      if (count === 0) return;
+
+      const transaction = await tx.transaction.findFirst({ where: { id: transactionId } });
+
+      if (transaction?.walletId && (transaction.type === "INCOME" || transaction.type === "EXPENSE")) {
         const balanceDelta =
           transaction.type === "INCOME"
             ? -Number(transaction.amount)
