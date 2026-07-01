@@ -1,5 +1,4 @@
 import { randomUUID } from "crypto";
-import { makeAppError } from "../../src/shared/errors/make-app-error.js";
 import type { InMemoryWallet } from "./in-memory-wallet.repository.ts";
 
 type TransactionType = "INCOME" | "EXPENSE" | "BALANCE_ADJUSTMENT";
@@ -42,7 +41,7 @@ export const makeInMemoryTransactionRepository = (wallets: InMemoryWallet[]) => 
     items,
 
     findById: async (id: string) => {
-      return items.find((t) => t.id === id && t.deletedAt === null) ?? null;
+      return items.find((t) => t.id === id) ?? null;
     },
 
     createWithBalanceUpdate: async (data: CreateWithBalanceData) => {
@@ -71,15 +70,11 @@ export const makeInMemoryTransactionRepository = (wallets: InMemoryWallet[]) => 
       return transaction;
     },
 
-    softDeleteWithReversal: async (transactionId: string, userId: string) => {
-      const transaction = items.find((t) => t.id === transactionId && t.deletedAt === null);
-      if (!transaction || transaction.userId !== userId) {
-        throw makeAppError({
-          code: "TRANSACTION_NOT_FOUND",
-          message: "Transação não encontrada",
-          statusCode: 404,
-        });
-      }
+    softDeleteWithReversal: async (transactionId: string) => {
+      const transaction = items.find((t) => t.id === transactionId);
+
+      // Guarda atômica: se já não existir ou já estiver deletada, não reverte o saldo de novo.
+      if (!transaction || transaction.deletedAt !== null) return;
 
       transaction.deletedAt = new Date();
 

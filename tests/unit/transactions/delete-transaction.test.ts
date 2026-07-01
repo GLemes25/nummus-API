@@ -88,7 +88,48 @@ describe("makeDeleteTransactionUseCase", () => {
     expect(walletRepo.items.find((w) => w.id === wallet.id)?.balance).toBe(500);
   });
 
-  it("should throw when trying to delete an already deleted transaction", async () => {
+  it("should throw TRANSACTION_NOT_FOUND when the transaction does not exist", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+
+    // Act & Assert
+    await expect(
+      deleteTransaction({ transactionId: faker.string.uuid(), userId })
+    ).rejects.toMatchObject({
+      code: "TRANSACTION_NOT_FOUND",
+      message: "Transação não encontrada",
+      statusCode: 404,
+    });
+  });
+
+  it("should throw TRANSACTION_ACCESS_DENIED when the transaction belongs to another user", async () => {
+    // Arrange
+    const ownerId = faker.string.uuid();
+    const otherUserId = faker.string.uuid();
+    const wallet = await walletRepo.create(makeFakeWallet({ userId: ownerId, initialBalance: 1000 }));
+    const category = await categoryRepo.create(makeFakeCategory({ userId: ownerId }));
+
+    const transaction = await createTransaction(
+      makeFakeTransaction({
+        userId: ownerId,
+        walletId: wallet.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CASH",
+        amount: 100,
+      })
+    );
+
+    // Act & Assert
+    await expect(
+      deleteTransaction({ transactionId: transaction.id, userId: otherUserId })
+    ).rejects.toMatchObject({
+      code: "TRANSACTION_ACCESS_DENIED",
+      statusCode: 403,
+    });
+  });
+
+  it("should be idempotent and not refund the wallet twice if deleted repeatedly", async () => {
     // Arrange
     const userId = faker.string.uuid();
     const wallet = await walletRepo.create(makeFakeWallet({ userId, initialBalance: 1000 }));
@@ -105,14 +146,15 @@ describe("makeDeleteTransactionUseCase", () => {
       })
     );
 
+    // Act
     await deleteTransaction({ transactionId: transaction.id, userId });
+    const balanceAfterFirstDelete = walletRepo.items.find((w) => w.id === wallet.id)?.balance;
 
-    // Act & Assert
-    await expect(
-      deleteTransaction({ transactionId: transaction.id, userId })
-    ).rejects.toMatchObject({
-      code: "TRANSACTION_NOT_FOUND",
-      message: "Transação não encontrada",
-    });
+    await deleteTransaction({ transactionId: transaction.id, userId });
+    const balanceAfterSecondDelete = walletRepo.items.find((w) => w.id === wallet.id)?.balance;
+
+    // Assert
+    expect(balanceAfterFirstDelete).toBe(1000);
+    expect(balanceAfterSecondDelete).toBe(1000);
   });
 });
