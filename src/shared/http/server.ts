@@ -11,9 +11,6 @@ import {
 } from "fastify-type-provider-zod";
 import { z } from "zod";
 
-import { auth } from "../lib/auth.js";
-import { env } from "../lib/env.js";
-import { errorHandler } from "./error-handler.js";
 import { categoryRoutes } from "../../modules/categories/http/category.routes.js";
 import { categoryRepository } from "../../modules/categories/repositories/category.repository.js";
 import { costCenterRoutes } from "../../modules/cost-centers/http/cost-center.routes.js";
@@ -24,6 +21,9 @@ import { transactionRoutes } from "../../modules/transactions/http/transaction.r
 import { transferRoutes } from "../../modules/transfers/http/transfer.routes.js";
 import { walletRoutes } from "../../modules/wallets/http/wallet.routes.js";
 import { walletRepository } from "../../modules/wallets/repositories/wallet.repository.js";
+import { auth } from "../lib/auth.js";
+import { env } from "../lib/env.js";
+import { errorHandler } from "./error-handler.js";
 
 const envToLogger = {
   development: {
@@ -93,7 +93,7 @@ export const buildApp = async () => {
       findCategory: categoryRepository.findById,
       findCreditCard: creditCardRepository.findById,
     }),
-    { prefix: "/transactions" }
+    { prefix: "/transactions" },
   );
 
   app.withTypeProvider<ZodTypeProvider>().route({
@@ -138,7 +138,10 @@ export const buildApp = async () => {
         app.log.error(error, "Authentication error");
         reply
           .status(500)
-          .send({ error: "Internal authentication error", code: "AUTH_FAILURE" });
+          .send({
+            error: "Internal authentication error",
+            code: "AUTH_FAILURE",
+          });
       }
     },
   });
