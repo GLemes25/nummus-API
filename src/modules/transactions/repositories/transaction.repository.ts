@@ -25,6 +25,21 @@ type CreateWithInvoiceData = {
   dueDate: Date;
 };
 
+type UpdateTransactionData = {
+  amount: number;
+  type: "INCOME" | "EXPENSE" | "BALANCE_ADJUSTMENT";
+  paymentMethod: "CASH" | "PIX" | "BANK_TRANSFER" | "DEBIT_CARD" | "CREDIT_CARD";
+  date: Date;
+  description: string;
+  walletId: string | null;
+  categoryId: string;
+};
+
+type WalletBalanceUpdate = {
+  walletId: string;
+  newBalance: number;
+};
+
 type FindManyPaginatedInput = {
   userId: string;
   page: number;
@@ -95,6 +110,36 @@ export const transactionRepository = {
         where: { id: data.walletId },
         data: { balance: data.newBalance },
       });
+
+      return transaction;
+    });
+  },
+
+  updateWithBalanceUpdate: async (
+    transactionId: string,
+    data: UpdateTransactionData,
+    walletUpdates: WalletBalanceUpdate[]
+  ) => {
+    return prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.update({
+        where: { id: transactionId },
+        data: {
+          amount: data.amount,
+          type: data.type,
+          paymentMethod: data.paymentMethod,
+          date: data.date,
+          description: data.description,
+          walletId: data.walletId,
+          categoryId: data.categoryId,
+        },
+      });
+
+      for (const walletUpdate of walletUpdates) {
+        await tx.wallet.update({
+          where: { id: walletUpdate.walletId },
+          data: { balance: walletUpdate.newBalance },
+        });
+      }
 
       return transaction;
     });
