@@ -5,10 +5,12 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { verifyAuth } from "../../../shared/http/hooks/verify-auth.js";
 import { appErrorResponseSchema } from "../../../shared/errors/make-app-error.js";
 import { createTransactionSchema, transactionResponseSchema } from "../dtos/create-transaction.dto.js";
+import { updateTransactionSchema } from "../dtos/update-transaction.dto.js";
 import { getTransactionsSchema, getTransactionsResponseSchema } from "../dtos/get-transactions.dto.js";
 import { transactionRepository } from "../repositories/transaction.repository.js";
 import { makeCreateTransactionUseCase } from "../use-cases/create-transaction.use-case.js";
 import { makeGetTransactionsUseCase } from "../use-cases/get-transactions.use-case.js";
+import { makeUpdateTransactionUseCase } from "../use-cases/update-transaction.use-case.js";
 import { makeDeleteTransactionUseCase } from "../use-cases/delete-transaction.use-case.js";
 import { presentTransaction, presentTransactionListItem } from "./presenters/transaction.presenter.js";
 
@@ -31,6 +33,7 @@ export const transactionRoutes =
       deps.findCreditCard
     );
     const getTransactions = makeGetTransactionsUseCase(transactionRepository);
+    const updateTransaction = makeUpdateTransactionUseCase(transactionRepository, deps.findWallet);
     const deleteTransaction = makeDeleteTransactionUseCase(transactionRepository);
 
     app.withTypeProvider<ZodTypeProvider>().route({
@@ -69,6 +72,30 @@ export const transactionRoutes =
         const userId = request.userId;
         const transaction = await createTransaction({ ...request.body, userId });
         return reply.status(201).send(presentTransaction(transaction));
+      },
+    });
+
+    app.withTypeProvider<ZodTypeProvider>().route({
+      method: "PATCH",
+      url: "/:id",
+      preHandler: [verifyAuth],
+      schema: {
+        tags: ["Transactions"],
+        params: z.object({ id: z.string() }),
+        body: updateTransactionSchema,
+        response: {
+          200: transactionResponseSchema,
+          403: appErrorResponseSchema,
+          404: appErrorResponseSchema,
+        },
+      },
+      handler: async (request, reply) => {
+        const transaction = await updateTransaction({
+          transactionId: request.params.id,
+          userId: request.userId,
+          data: request.body,
+        });
+        return reply.status(200).send(presentTransaction(transaction));
       },
     });
 
