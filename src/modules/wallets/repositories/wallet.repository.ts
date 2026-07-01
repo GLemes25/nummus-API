@@ -1,6 +1,7 @@
 import { prisma } from "../../../shared/lib/prisma.js";
 
 import type { CreateWalletDto } from "../dtos/create-wallet.dto.js";
+import type { UpdateWalletDto } from "../dtos/update-wallet.dto.js";
 
 type CreateWalletInput = CreateWalletDto & { userId: string };
 
@@ -33,6 +34,17 @@ export const walletRepository = {
         ...(isArchived !== undefined ? { isArchived } : {}),
       },
       orderBy: { createdAt: "desc" },
+    });
+  },
+
+  update: async (id: string, data: UpdateWalletDto) => {
+    return prisma.wallet.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.currency !== undefined ? { currency: data.currency } : {}),
+        ...(data.initialBalance !== undefined ? { initialBalance: data.initialBalance } : {}),
+      },
     });
   },
 };
