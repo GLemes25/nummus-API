@@ -53,5 +53,12 @@ export const makeInMemoryCategoryRepository = () => {
     findManyByUser: async (userId: string) => {
       return items.filter((c) => c.userId === userId && c.deletedAt === null);
     },
+
+    update: async (id: string, data: Partial<Pick<InMemoryCategory, "name" | "color" | "icon" | "parentId">>) => {
+      const category = items.find((c) => c.id === id);
+      if (!category) return null;
+      Object.assign(category, data, { updatedAt: new Date() });
+      return category;
+    },
   };
 };
