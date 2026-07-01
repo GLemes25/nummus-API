@@ -1,6 +1,7 @@
 import { prisma } from "../../../shared/lib/prisma.js";
 
 import type { CreateCategoryDto } from "../dtos/create-category.dto.js";
+import type { UpdateCategoryDto } from "../dtos/update-category.dto.js";
 
 type CreateCategoryInput = CreateCategoryDto & { userId: string };
 
@@ -34,6 +35,18 @@ export const categoryRepository = {
         icon: data.icon,
         parentId: data.parentId ?? null,
         userId: data.userId,
+      },
+    });
+  },
+
+  update: async (id: string, data: UpdateCategoryDto) => {
+    return prisma.category.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.color !== undefined ? { color: data.color } : {}),
+        ...(data.icon !== undefined ? { icon: data.icon } : {}),
+        ...(data.parentId !== undefined ? { parentId: data.parentId } : {}),
       },
     });
   },
