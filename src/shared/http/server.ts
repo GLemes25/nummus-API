@@ -33,7 +33,7 @@ const envToLogger = {
     },
   },
   production: true,
-  test: false,
+  homologation: false,
 };
 
 export const buildApp = async () => {
