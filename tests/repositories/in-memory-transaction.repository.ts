@@ -34,6 +34,21 @@ type CreateWithBalanceData = {
   newBalance: number;
 };
 
+type UpdateTransactionData = {
+  amount: number;
+  type: TransactionType;
+  paymentMethod: PaymentMethod;
+  date: Date;
+  description: string;
+  walletId: string | null;
+  categoryId: string;
+};
+
+type WalletBalanceUpdate = {
+  walletId: string;
+  newBalance: number;
+};
+
 export const makeInMemoryTransactionRepository = (wallets: InMemoryWallet[]) => {
   const items: InMemoryTransaction[] = [];
 
@@ -66,6 +81,24 @@ export const makeInMemoryTransactionRepository = (wallets: InMemoryWallet[]) => 
 
       const wallet = wallets.find((w) => w.id === data.walletId);
       if (wallet) wallet.balance = data.newBalance;
+
+      return transaction;
+    },
+
+    updateWithBalanceUpdate: async (
+      transactionId: string,
+      data: UpdateTransactionData,
+      walletUpdates: WalletBalanceUpdate[]
+    ) => {
+      const transaction = items.find((t) => t.id === transactionId);
+      if (!transaction) return null;
+
+      Object.assign(transaction, data, { updatedAt: new Date() });
+
+      for (const walletUpdate of walletUpdates) {
+        const wallet = wallets.find((w) => w.id === walletUpdate.walletId);
+        if (wallet) wallet.balance = walletUpdate.newBalance;
+      }
 
       return transaction;
     },
