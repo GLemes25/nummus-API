@@ -15,7 +15,7 @@ export type AppError = Error & {
 type MakeAppErrorParams = {
   code: string;
   message: string;
-  statusCode?: number;
+  statusCode?: 400 | 403 | 404 | 409 | 500;
 };
 
 export const makeAppError = (params: MakeAppErrorParams): AppError => {
