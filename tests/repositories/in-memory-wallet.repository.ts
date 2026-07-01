@@ -55,5 +55,12 @@ export const makeInMemoryWalletRepository = () => {
         .filter((w) => w.userId === userId && w.deletedAt === null)
         .filter((w) => isArchived === undefined || w.isArchived === isArchived);
     },
+
+    update: async (id: string, data: Partial<Pick<InMemoryWallet, "name" | "currency" | "initialBalance">>) => {
+      const wallet = items.find((w) => w.id === id);
+      if (!wallet) return null;
+      Object.assign(wallet, data, { updatedAt: new Date() });
+      return wallet;
+    },
   };
 };
