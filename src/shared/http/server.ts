@@ -1,4 +1,5 @@
 import fastifyCors from "@fastify/cors";
+import fastifyRateLimit from "@fastify/rate-limit";
 import fastifySwagger from "@fastify/swagger";
 import fastifyApiReference from "@scalar/fastify-api-reference";
 import Fastify from "fastify";
@@ -79,6 +80,17 @@ export const buildApp = async () => {
   await app.register(fastifyCors, {
     origin: [env.WEB_APP_BASE_URL],
     credentials: true,
+  });
+
+  await app.register(fastifyRateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      code: "TOO_MANY_REQUESTS",
+      message:
+        "Você enviou requisições demais. Por favor, aguarde um minuto e tente novamente.",
+    }),
   });
 
   await app.register(walletRoutes, { prefix: "/wallets" });
