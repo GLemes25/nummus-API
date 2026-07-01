@@ -13,4 +13,14 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string(),
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.safeParse(process.env);
+
+if (!parsedEnv.success) {
+  console.error(
+    "Erro na validação das variáveis de ambiente:",
+    parsedEnv.error.flatten().fieldErrors,
+  );
+  process.exit(1);
+}
+
+export const env = parsedEnv.data;
