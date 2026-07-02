@@ -2,7 +2,7 @@ import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
 type Env = {
-  DIRECT_URL: string;
+  DATABASE_URL: string;
 };
 
 export default defineConfig({
@@ -11,6 +11,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env<Env>("DIRECT_URL"),
+    url: env<Env>("DATABASE_URL"),
   },
 });
