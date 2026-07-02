@@ -19,7 +19,11 @@ COPY prisma ./prisma/
 # Instala todas as dependências (mantendo o Prisma CLI vivo)
 RUN pnpm install --frozen-lockfile
 
-# Gera o cliente do Prisma
+# Injeta uma URL falsa temporária apenas para o Prisma gerar as tipagens sem
+# reclamar (prisma.config.ts exige DATABASE_URL só para carregar a config;
+# a URL real é injetada em runtime via secrets do Fly)
+ENV DATABASE_URL="postgresql://fake:fake@localhost:5432/fake"
+
 RUN pnpm prisma generate
 
 # Copia o restante do código
