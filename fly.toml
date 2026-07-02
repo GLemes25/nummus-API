@@ -1,34 +1,38 @@
-app = "nummus-api"
-primary_region = "gru"
+# fly.toml app configuration file generated for nummus-api on 2026-07-02T17:51:53Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'nummus-api'
+primary_region = 'gru'
 
 [build]
 
 [env]
-  NODE_ENV = "production"
-  PORT = "8080"
-  API_BASE_URL = "https://nummus-api.fremez.com"
-  WEB_APP_BASE_URL = "https://nummus.fremez.com"
-  FRONTEND_URL = "https://nummus.fremez.com"
-  BETTER_AUTH_URL = "https://nummus-api.fremez.com"
-
-# Roda as migrations do Prisma antes de cada release
-release_command = "pnpm prisma migrate deploy"
+  API_BASE_URL = 'https://nummus-api.fremez.com'
+  BETTER_AUTH_URL = 'https://nummus-api.fremez.com'
+  FRONTEND_URL = 'https://nummus.fremez.com'
+  NODE_ENV = 'production'
+  PORT = '8080'
+  WEB_APP_BASE_URL = 'https://nummus.fremez.com'
+  release_command = 'pnpm prisma migrate deploy'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
   [[http_service.checks]]
-    grace_period = "10s"
-    interval = "30s"
-    method = "GET"
-    timeout = "5s"
-    path = "/"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/'
 
 [[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
+  memory = '512mb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 512
