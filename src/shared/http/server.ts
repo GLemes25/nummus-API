@@ -78,7 +78,7 @@ export const buildApp = async () => {
   });
 
   await app.register(fastifyCors, {
-    origin: [env.WEB_APP_BASE_URL],
+    origin: [env.WEB_APP_BASE_URL, "http://localhost:3000"],
     credentials: true,
   });
 
@@ -148,12 +148,10 @@ export const buildApp = async () => {
         reply.send(response.body);
       } catch (error) {
         app.log.error(error, "Authentication error");
-        reply
-          .status(500)
-          .send({
-            error: "Internal authentication error",
-            code: "AUTH_FAILURE",
-          });
+        reply.status(500).send({
+          error: "Internal authentication error",
+          code: "AUTH_FAILURE",
+        });
       }
     },
   });
