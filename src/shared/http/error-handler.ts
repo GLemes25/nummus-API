@@ -5,11 +5,15 @@ import { isAppError } from "../errors/make-app-error.js";
 
 export const errorHandler = (
   error: FastifyError,
-  _request: FastifyRequest,
+  request: FastifyRequest,
   reply: FastifyReply
 ) => {
   if (hasZodFastifySchemaValidationErrors(error)) {
     const firstIssue = error.validation[0];
+    request.log.error(
+      { validationErrors: error.validation, url: request.url, method: request.method },
+      "Zod validation failed"
+    );
     return reply.status(400).send({
       statusCode: 400,
       code: "VALIDATION_ERROR",
