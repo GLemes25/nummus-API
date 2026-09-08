@@ -19,7 +19,7 @@ export const createCreditCardSchema = z.object({
     .max(28, "O dia de vencimento deve estar entre 1 e 28"),
   walletId: z
     .string({ error: "O ID da carteira deve ser um texto válido" })
-    .uuid("O ID da carteira deve ser um UUID válido")
+    .min(1, "O ID da carteira é inválido")
     .optional(),
 });
 
