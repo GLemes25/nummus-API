@@ -18,8 +18,16 @@ type InMemoryCreditCardInvoice = {
   id: string;
   creditCardId: string;
   totalAmount: number;
+  paidAmount: number;
   paid: boolean;
   deletedAt: Date | null;
+};
+
+type InMemoryInvoiceTransaction = {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  paidAt: Date | null;
 };
 
 type InMemoryPaymentTransaction = {
@@ -27,6 +35,7 @@ type InMemoryPaymentTransaction = {
   amount: number;
   categoryId: string;
   userId: string;
+  invoiceId: string;
 };
 
 type UpdateCreditCardData = {
@@ -40,11 +49,13 @@ type UpdateCreditCardData = {
 export const makeInMemoryCreditCardRepository = (wallets?: InMemoryWallet[]) => {
   const items: InMemoryCreditCard[] = [];
   const invoices: InMemoryCreditCardInvoice[] = [];
+  const invoiceTransactions: InMemoryInvoiceTransaction[] = [];
   const paymentTransactions: InMemoryPaymentTransaction[] = [];
 
   return {
     items,
     invoices,
+    invoiceTransactions,
     paymentTransactions,
 
     findByNameAndUser: async (userId: string, name: string) => {
@@ -108,31 +119,48 @@ export const makeInMemoryCreditCardRepository = (wallets?: InMemoryWallet[]) => 
       if (card) card.deletedAt = new Date();
     },
 
-    findOpenInvoicesByCard: async (creditCardId: string) => {
-      return invoices.filter(
-        (i) => i.creditCardId === creditCardId && !i.paid && i.deletedAt === null,
+    findInvoiceById: async (invoiceId: string) => {
+      return invoices.find((i) => i.id === invoiceId && i.deletedAt === null) ?? null;
+    },
+
+    findInvoiceTransactionsByIds: async (invoiceId: string, transactionIds: string[]) => {
+      return invoiceTransactions.filter(
+        (t) => t.invoiceId === invoiceId && t.paidAt === null && transactionIds.includes(t.id),
       );
     },
 
-    payOpenInvoices: async (
-      creditCardId: string,
-      walletId: string,
-      totalAmount: number,
-      userId: string,
-      categoryId: string,
-    ) => {
-      invoices
-        .filter((i) => i.creditCardId === creditCardId && !i.paid && i.deletedAt === null)
-        .forEach((i) => {
-          i.paid = true;
-        });
+    payInvoice: async (params: {
+      invoiceId: string;
+      walletId: string;
+      amount: number;
+      userId: string;
+      categoryId: string;
+      transactionIds?: string[];
+    }) => {
+      const { invoiceId, walletId, amount, userId, categoryId, transactionIds } = params;
+
+      const invoice = invoices.find((i) => i.id === invoiceId);
+      if (invoice) {
+        invoice.paidAmount += amount;
+        if (invoice.paidAmount >= invoice.totalAmount) {
+          invoice.paid = true;
+        }
+      }
+
+      if (transactionIds && transactionIds.length > 0) {
+        invoiceTransactions
+          .filter((t) => t.invoiceId === invoiceId && transactionIds.includes(t.id))
+          .forEach((t) => {
+            t.paidAt = new Date();
+          });
+      }
 
       if (wallets) {
         const wallet = wallets.find((w) => w.id === walletId);
-        if (wallet) wallet.balance -= totalAmount;
+        if (wallet) wallet.balance -= amount;
       }
 
-      paymentTransactions.push({ walletId, amount: totalAmount, categoryId, userId });
+      paymentTransactions.push({ walletId, amount, categoryId, userId, invoiceId });
     },
   };
 };

@@ -27,8 +27,8 @@ describe("makeGetCreditCardsUseCase", () => {
     // Arrange
     const userId = faker.string.uuid();
     const card = await repo.create(makeFakeCreditCard({ userId }));
-    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 200, paid: false, deletedAt: null });
-    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 150, paid: false, deletedAt: null });
+    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 200, paidAmount: 0, paid: false, deletedAt: null });
+    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 150, paidAmount: 0, paid: false, deletedAt: null });
 
     // Act
     const result = await getCreditCards(userId);
@@ -56,8 +56,8 @@ describe("makeGetCreditCardsUseCase", () => {
     // Arrange
     const userId = faker.string.uuid();
     const card = await repo.create(makeFakeCreditCard({ userId }));
-    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 500, paid: true, deletedAt: null });
-    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 100, paid: false, deletedAt: null });
+    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 500, paidAmount: 0, paid: true, deletedAt: null });
+    repo.invoices.push({ id: faker.string.uuid(), creditCardId: card.id, totalAmount: 100, paidAmount: 0, paid: false, deletedAt: null });
 
     // Act
     const result = await getCreditCards(userId);
