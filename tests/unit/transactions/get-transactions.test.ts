@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { faker } from "@faker-js/faker";
 import { makeGetTransactionsUseCase } from "../../../src/modules/transactions/use-cases/get-transactions.use-case.js";
+import { makeCreateTransactionUseCase } from "../../../src/modules/transactions/use-cases/create-transaction.use-case.js";
 import { makeInMemoryTransactionRepository } from "../../repositories/in-memory-transaction.repository.js";
 import { makeInMemoryWalletRepository } from "../../repositories/in-memory-wallet.repository.js";
+import { makeInMemoryCategoryRepository } from "../../repositories/in-memory-category.repository.js";
 
 describe("makeGetTransactionsUseCase", () => {
   let walletRepo: ReturnType<typeof makeInMemoryWalletRepository>;
@@ -381,5 +383,87 @@ describe("makeGetTransactionsUseCase", () => {
     expect(result.data).toHaveLength(0);
     expect(result.meta.totalCount).toBe(0);
     expect(result.meta.totalPages).toBe(0);
+  });
+
+  it("should expose a distinct invoice per credit card installment so clients can group by billing cycle", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const categoryRepo = makeInMemoryCategoryRepository();
+    const creditCard = { id: faker.string.uuid(), closingDay: 10, dueDay: 5, userId };
+    const createTransaction = makeCreateTransactionUseCase(
+      transactionRepo as any,
+      (id) => walletRepo.findById(id) as any,
+      (id) => categoryRepo.findById(id) as any,
+      async (id) => (id === creditCard.id ? creditCard : null)
+    );
+
+    // Act — R$300 em 3x no cartão, comprado após o fechamento (dia 15 > closingDay 10)
+    await createTransaction({
+      userId,
+      creditCardId: creditCard.id,
+      type: "EXPENSE",
+      paymentMethod: "CREDIT",
+      amount: 300,
+      date: new Date(2024, 7, 15), // August 15, 2024
+      description: "Fogão",
+      installments: 3,
+    });
+    const result = await getTransactions({ userId, page: 1, limit: 20, creditCardId: creditCard.id });
+
+    // Assert — cada parcela deve carregar a fatura (competência/vencimento) à qual pertence
+    expect(result.data).toHaveLength(3);
+    const invoiceIds = result.data.map((t) => t.invoice?.id);
+    expect(new Set(invoiceIds).size).toBe(3);
+    for (const transaction of result.data) {
+      expect(transaction.invoiceId).not.toBeNull();
+      expect(transaction.invoice).not.toBeNull();
+      expect(transaction.invoice!.id).toBe(transaction.invoiceId);
+    }
+
+    // Vencimentos sequenciais: Out/2024, Nov/2024, Dez/2024
+    const dueMonths = result.data
+      .slice()
+      .sort((a, b) => a.installmentNumber! - b.installmentNumber!)
+      .map((t) => t.invoice!.dueDate.getMonth());
+    expect(dueMonths).toEqual([9, 10, 11]);
+  });
+
+  it("should keep two purchases in the same invoice when the billing period spans two calendar months", async () => {
+    // Arrange — fechamento dia 25: compra em 28/dez e em 05/jan caem na MESMA fatura (venc. fev)
+    const userId = faker.string.uuid();
+    const categoryRepo = makeInMemoryCategoryRepository();
+    const creditCard = { id: faker.string.uuid(), closingDay: 25, dueDay: 5, userId };
+    const createTransaction = makeCreateTransactionUseCase(
+      transactionRepo as any,
+      (id) => walletRepo.findById(id) as any,
+      (id) => categoryRepo.findById(id) as any,
+      async (id) => (id === creditCard.id ? creditCard : null)
+    );
+
+    // Act
+    await createTransaction({
+      userId,
+      creditCardId: creditCard.id,
+      type: "EXPENSE",
+      paymentMethod: "CREDIT",
+      amount: 80,
+      date: new Date(2024, 11, 28), // December 28, 2024 (after closing)
+      description: "Presente de Natal",
+    });
+    await createTransaction({
+      userId,
+      creditCardId: creditCard.id,
+      type: "EXPENSE",
+      paymentMethod: "CREDIT",
+      amount: 40,
+      date: new Date(2025, 0, 5), // January 5, 2025 (before closing)
+      description: "Farmácia",
+    });
+    const result = await getTransactions({ userId, page: 1, limit: 20, creditCardId: creditCard.id });
+
+    // Assert — mesma fatura mesmo estando em meses civis diferentes
+    expect(result.data).toHaveLength(2);
+    expect(result.data[0]!.invoice!.id).toBe(result.data[1]!.invoice!.id);
+    expect(result.data[0]!.invoice!.dueDate.getMonth()).toBe(1); // Fevereiro
   });
 });

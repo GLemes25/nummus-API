@@ -118,6 +118,7 @@ export const transactionRepository = {
         include: {
           category: { select: { id: true, name: true, color: true, icon: true } },
           wallet: { select: { id: true, name: true, currency: true } },
+          invoice: { select: { id: true, periodStartDate: true, periodEndDate: true, dueDate: true } },
         },
         orderBy: { date: "desc" },
         skip,

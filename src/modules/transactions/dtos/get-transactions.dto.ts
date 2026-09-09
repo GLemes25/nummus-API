@@ -49,6 +49,8 @@ export const transactionListItemSchema = z.object({
   creditCardId: z.string().nullable(),
   categoryId: z.string().nullable(),
   userId: z.string(),
+  installmentId: z.string().nullable(),
+  installmentNumber: z.number().int().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   category: z
@@ -64,6 +66,14 @@ export const transactionListItemSchema = z.object({
       id: z.string(),
       name: z.string(),
       currency: z.string(),
+    })
+    .nullable(),
+  invoice: z
+    .object({
+      id: z.string(),
+      periodStartDate: z.date(),
+      periodEndDate: z.date(),
+      dueDate: z.date(),
     })
     .nullable(),
 });

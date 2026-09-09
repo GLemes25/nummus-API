@@ -7,6 +7,7 @@ type TransactionWithRelations = Prisma.TransactionGetPayload<{
   include: {
     category: { select: { id: true; name: true; color: true; icon: true } };
     wallet: { select: { id: true; name: true; currency: true } };
+    invoice: { select: { id: true; periodStartDate: true; periodEndDate: true; dueDate: true } };
   };
 }>;
 
@@ -20,6 +21,7 @@ export const presentTransaction = (transaction: Transaction): TransactionRespons
   description: transaction.description,
   walletId: transaction.walletId,
   creditCardId: transaction.creditCardId,
+  invoiceId: transaction.invoiceId,
   installmentId: transaction.installmentId,
   installmentNumber: transaction.installmentNumber,
   categoryId: transaction.categoryId,
@@ -40,8 +42,11 @@ export const presentTransactionListItem = (transaction: TransactionWithRelations
   creditCardId: transaction.creditCardId,
   categoryId: transaction.categoryId,
   userId: transaction.userId,
+  installmentId: transaction.installmentId,
+  installmentNumber: transaction.installmentNumber,
   createdAt: transaction.createdAt,
   updatedAt: transaction.updatedAt,
   category: transaction.category,
   wallet: transaction.wallet,
+  invoice: transaction.invoice,
 });

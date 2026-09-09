@@ -71,6 +71,7 @@ export const transactionResponseSchema = z.object({
   description: z.string(),
   walletId: z.string().nullable(),
   creditCardId: z.string().nullable(),
+  invoiceId: z.string().nullable(),
   installmentId: z.string().nullable(),
   installmentNumber: z.number().int().nullable(),
   categoryId: z.string().nullable(),
