@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 // Valida, após o backfill, que invoice.totalAmount de cada fatura de cartão
 // bate com a soma real das transações vinculadas a ela. Um MISMATCH indica
 // fatura que já existia com total calculado por outro caminho (e agora foi

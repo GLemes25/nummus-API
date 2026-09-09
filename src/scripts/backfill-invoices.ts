@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 // Script de migração pontual: liga transações de cartão legadas (sem invoiceId)
 // à fatura correspondente, criando a fatura quando ela ainda não existir.
 //
