@@ -21,8 +21,11 @@ const CREDIT_CARD_PAYMENT_SYSTEM_ID = "CREDIT_CARD_PAYMENT";
 
 type PayInvoiceInput = {
   creditCardId: string;
+  invoiceId: string;
   walletId: string;
   userId: string;
+  transactionIds?: string[];
+  amount?: number;
 };
 
 export const makePayInvoiceUseCase = (
@@ -31,7 +34,7 @@ export const makePayInvoiceUseCase = (
   findCategoryBySystemId: FindCategoryBySystemId,
   createSystemCategory: CreateSystemCategory,
 ) => {
-  return async ({ creditCardId, walletId, userId }: PayInvoiceInput) => {
+  return async ({ creditCardId, invoiceId, walletId, userId, transactionIds, amount }: PayInvoiceInput) => {
     const creditCard = await repository.findById(creditCardId);
 
     if (!creditCard) {
@@ -68,17 +71,61 @@ export const makePayInvoiceUseCase = (
       });
     }
 
-    const openInvoices = await repository.findOpenInvoicesByCard(creditCardId);
+    const invoice = await repository.findInvoiceById(invoiceId);
 
-    if (openInvoices.length === 0) {
+    if (!invoice) {
       throw makeAppError({
-        code: "NO_OPEN_INVOICE",
-        message: "Não há faturas em aberto para este cartão",
+        code: "INVOICE_NOT_FOUND",
+        message: "Fatura não encontrada",
+        statusCode: 404,
+      });
+    }
+
+    if (invoice.creditCardId !== creditCardId) {
+      throw makeAppError({
+        code: "INVOICE_CARD_MISMATCH",
+        message: "Esta fatura não pertence ao cartão informado",
+        statusCode: 403,
+      });
+    }
+
+    const remainingAmount = Number(invoice.totalAmount) - Number(invoice.paidAmount);
+
+    if (invoice.paid || remainingAmount <= 0) {
+      throw makeAppError({
+        code: "INVOICE_ALREADY_PAID",
+        message: "Esta fatura já foi quitada",
         statusCode: 400,
       });
     }
 
-    const totalAmount = openInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+    let amountToPay: number;
+    let itemizedTransactionIds: string[] | undefined;
+
+    if (transactionIds && transactionIds.length > 0) {
+      const transactions = await repository.findInvoiceTransactionsByIds(invoiceId, transactionIds);
+
+      if (transactions.length !== transactionIds.length) {
+        throw makeAppError({
+          code: "INVOICE_TRANSACTION_NOT_FOUND",
+          message: "Uma ou mais transações informadas não pertencem a esta fatura ou já foram pagas",
+          statusCode: 404,
+        });
+      }
+
+      amountToPay = transactions.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+      itemizedTransactionIds = transactionIds;
+    } else {
+      amountToPay = amount ?? remainingAmount;
+    }
+
+    if (amountToPay > remainingAmount) {
+      throw makeAppError({
+        code: "PAYMENT_EXCEEDS_INVOICE_BALANCE",
+        message: "O valor do pagamento excede o saldo devedor da fatura",
+        statusCode: 400,
+      });
+    }
 
     const category =
       (await findCategoryBySystemId(userId, CREDIT_CARD_PAYMENT_SYSTEM_ID)) ??
@@ -90,6 +137,13 @@ export const makePayInvoiceUseCase = (
         color: "#64748B",
       }));
 
-    await repository.payOpenInvoices(creditCardId, walletId, totalAmount, userId, category.id);
+    await repository.payInvoice({
+      invoiceId,
+      walletId,
+      amount: amountToPay,
+      userId,
+      categoryId: category.id,
+      ...(itemizedTransactionIds !== undefined ? { transactionIds: itemizedTransactionIds } : {}),
+    });
   };
 };
