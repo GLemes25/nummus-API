@@ -13,7 +13,7 @@ type FindCreditCard = (id: string) => Promise<CreditCardSnapshot | null>;
 
 type CreateTransactionInput = CreateTransactionDto & { userId: string };
 
-const computeInvoicePeriod = (date: Date, closingDay: number, dueDay: number) => {
+export const computeInvoicePeriod = (date: Date, closingDay: number, dueDay: number) => {
   const day = date.getDate();
   const month = date.getMonth();
   const year = date.getFullYear();
