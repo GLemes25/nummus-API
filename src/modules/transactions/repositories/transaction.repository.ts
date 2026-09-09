@@ -200,8 +200,10 @@ export const transactionRepository = {
 
       const transaction = await tx.transaction.findFirst({ where: { id: transactionId } });
 
+      if (!transaction) return;
+
       if (
-        transaction?.walletId &&
+        transaction.walletId &&
         transaction.status === "COMPLETED" &&
         (transaction.type === "INCOME" || transaction.type === "EXPENSE")
       ) {
@@ -213,6 +215,30 @@ export const transactionRepository = {
         await tx.wallet.update({
           where: { id: transaction.walletId },
           data: { balance: { increment: balanceDelta } },
+        });
+      }
+
+      // Transação de pagamento de fatura (saída de carteira vinculada a uma invoice,
+      // sem creditCardId — diferente de uma compra no cartão): reverte o abatimento
+      // feito na fatura e libera de volta as transações do cartão que ela quitou.
+      if (transaction.invoiceId && transaction.walletId && !transaction.creditCardId) {
+        const invoice = await tx.creditCardInvoice.findFirst({ where: { id: transaction.invoiceId } });
+
+        if (invoice) {
+          const revertedPaidAmount = Math.max(0, Number(invoice.paidAmount) - Number(transaction.amount));
+
+          await tx.creditCardInvoice.update({
+            where: { id: invoice.id },
+            data: {
+              paidAmount: revertedPaidAmount,
+              paid: revertedPaidAmount >= Number(invoice.totalAmount),
+            },
+          });
+        }
+
+        await tx.transaction.updateMany({
+          where: { paidByTransactionId: transactionId },
+          data: { paidAt: null, paidByTransactionId: null },
         });
       }
     });

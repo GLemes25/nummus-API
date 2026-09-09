@@ -288,6 +288,194 @@ describe("makeGetTransactionsUseCase", () => {
     expect(result.meta.totalCount).toBe(1);
   });
 
+  it("should filter transactions by month and year (competência)", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const walletId = faker.string.uuid();
+
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 200,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2024, 7, 15), // August 2024
+      description: "in month",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 200,
+    });
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 300,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2024, 8, 1), // September 2024
+      description: "out of month",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 500,
+    });
+
+    // Act
+    const result = await getTransactions({ userId, page: 1, limit: 20, month: 8, year: 2024 });
+
+    // Assert
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.description).toBe("in month");
+  });
+
+  it("should filter transactions by year only, covering every month of that year", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const walletId = faker.string.uuid();
+
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2024, 0, 5),
+      description: "january 2024",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 100,
+    });
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2025, 0, 5),
+      description: "january 2025",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 200,
+    });
+
+    // Act
+    const result = await getTransactions({ userId, page: 1, limit: 20, year: 2024 });
+
+    // Assert
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.description).toBe("january 2024");
+  });
+
+  it("should default the year to the current year when only month is given", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const walletId = faker.string.uuid();
+    const now = new Date();
+
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(now.getFullYear(), 5, 10), // June of current year
+      description: "this year june",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 100,
+    });
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(now.getFullYear() - 1, 5, 10), // June of last year
+      description: "last year june",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 200,
+    });
+
+    // Act
+    const result = await getTransactions({ userId, page: 1, limit: 20, month: 6 });
+
+    // Assert
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.description).toBe("this year june");
+  });
+
+  it("should return everything when neither month/year nor startDate/endDate are given", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const walletId = faker.string.uuid();
+
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2020, 0, 1),
+      description: "old",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 100,
+    });
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2027, 0, 1),
+      description: "future",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 200,
+    });
+
+    // Act
+    const result = await getTransactions({ userId, page: 1, limit: 20 });
+
+    // Assert — unfiltered listing must not silently narrow to any default period
+    expect(result.data).toHaveLength(2);
+  });
+
+  it("should prioritize explicit startDate/endDate over month/year when both are present", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const walletId = faker.string.uuid();
+
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2024, 7, 15), // August 2024
+      description: "august",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 100,
+    });
+    await transactionRepo.createWithBalanceUpdate({
+      storedAmount: 100,
+      type: "INCOME",
+      paymentMethod: "CASH",
+      date: new Date(2024, 6, 15), // July 2024
+      description: "july",
+      walletId,
+      categoryId: faker.string.uuid(),
+      userId,
+      newBalance: 200,
+    });
+
+    // Act — month/year point at August, but startDate/endDate point at July
+    const result = await getTransactions({
+      userId,
+      page: 1,
+      limit: 20,
+      month: 8,
+      year: 2024,
+      startDate: new Date(2024, 6, 1),
+      endDate: new Date(2024, 6, 31, 23, 59, 59, 999),
+    });
+
+    // Assert
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0]!.description).toBe("july");
+  });
+
   it("should paginate results and return the correct page slice", async () => {
     // Arrange
     const userId = faker.string.uuid();

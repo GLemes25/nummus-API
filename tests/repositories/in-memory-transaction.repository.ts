@@ -19,6 +19,8 @@ export type InMemoryTransaction = {
   userId: string;
   installmentId: string | null;
   installmentNumber: number | null;
+  paidAt: Date | null;
+  paidByTransactionId: string | null;
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -102,6 +104,7 @@ export type InMemoryCreditCardInvoice = {
   periodEndDate: Date;
   dueDate: Date;
   totalAmount: number;
+  paidAmount: number;
   paid: boolean;
   deletedAt: Date | null;
   createdAt: Date;
@@ -152,6 +155,8 @@ export const makeInMemoryTransactionRepository = (
         userId: data.userId,
         installmentId: null,
         installmentNumber: null,
+        paidAt: null,
+        paidByTransactionId: null,
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -201,6 +206,23 @@ export const makeInMemoryTransactionRepository = (
         if (wallet) {
           const delta = transaction.type === "INCOME" ? -transaction.amount : transaction.amount;
           wallet.balance += delta;
+        }
+      }
+
+      if (transaction.invoiceId && transaction.walletId && !transaction.creditCardId) {
+        const invoice = invoices.find((i) => i.id === transaction.invoiceId);
+
+        if (invoice) {
+          invoice.paidAmount = Math.max(0, invoice.paidAmount - transaction.amount);
+          invoice.paid = invoice.paidAmount >= invoice.totalAmount;
+          invoice.updatedAt = new Date();
+        }
+
+        for (const settled of items) {
+          if (settled.paidByTransactionId === transactionId) {
+            settled.paidAt = null;
+            settled.paidByTransactionId = null;
+          }
         }
       }
     },
@@ -253,6 +275,7 @@ export const makeInMemoryTransactionRepository = (
           periodEndDate: data.periodEnd,
           dueDate: data.dueDate,
           totalAmount: 0,
+          paidAmount: 0,
           paid: false,
           deletedAt: null,
           createdAt: new Date(),
@@ -279,6 +302,8 @@ export const makeInMemoryTransactionRepository = (
         userId: data.userId,
         installmentId: null,
         installmentNumber: null,
+        paidAt: null,
+        paidByTransactionId: null,
         deletedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -311,6 +336,8 @@ export const makeInMemoryTransactionRepository = (
           userId: item.userId,
           installmentId: item.installmentId,
           installmentNumber: item.installmentNumber,
+          paidAt: null,
+          paidByTransactionId: null,
           deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -347,6 +374,7 @@ export const makeInMemoryTransactionRepository = (
             periodEndDate: item.periodEnd,
             dueDate: item.dueDate,
             totalAmount: 0,
+            paidAmount: 0,
             paid: false,
             deletedAt: null,
             createdAt: new Date(),
@@ -373,6 +401,8 @@ export const makeInMemoryTransactionRepository = (
           userId: item.userId,
           installmentId: item.installmentId,
           installmentNumber: item.installmentNumber,
+          paidAt: null,
+          paidByTransactionId: null,
           deletedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),

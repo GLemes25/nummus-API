@@ -13,6 +13,7 @@ import { makeGetCreditCardsUseCase } from "../use-cases/get-credit-cards.use-cas
 import { makeUpdateCreditCardUseCase } from "../use-cases/update-credit-card.use-case.js";
 import { makeDeleteCreditCardUseCase } from "../use-cases/delete-credit-card.use-case.js";
 import { makePayInvoiceUseCase } from "../use-cases/pay-invoice.use-case.js";
+import { makeReopenInvoiceUseCase } from "../use-cases/reopen-invoice.use-case.js";
 import { presentCreditCard } from "./presenters/credit-card.presenter.js";
 
 type WalletSnapshot = { balance: { toNumber: () => number }; userId: string };
@@ -49,6 +50,7 @@ export const creditCardRoutes =
       findCategoryBySystemId,
       createSystemCategory,
     );
+    const reopenInvoice = makeReopenInvoiceUseCase(creditCardRepository);
 
     app.withTypeProvider<ZodTypeProvider>().route({
       method: "GET",
@@ -165,6 +167,26 @@ export const creditCardRoutes =
             : {}),
           ...(request.body.amount !== undefined ? { amount: request.body.amount } : {}),
         });
+        return reply.status(204).send();
+      },
+    });
+
+    app.withTypeProvider<ZodTypeProvider>().route({
+      method: "POST",
+      url: "/invoices/:id/reopen",
+      preHandler: [verifyAuth],
+      schema: {
+        tags: ["Credit Cards"],
+        params: z.object({ id: z.string() }),
+        response: {
+          204: z.void(),
+          400: appErrorResponseSchema,
+          403: appErrorResponseSchema,
+          404: appErrorResponseSchema,
+        },
+      },
+      handler: async (request, reply) => {
+        await reopenInvoice({ invoiceId: request.params.id, userId: request.userId });
         return reply.status(204).send();
       },
     });

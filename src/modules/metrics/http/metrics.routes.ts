@@ -86,8 +86,14 @@ export const metricsRoutes = async (app: FastifyInstance) => {
       },
     },
     handler: async (request, reply) => {
-      const { startDate, endDate } = request.query;
-      const summary = await getMonthlySummary({ userId: request.userId, startDate, endDate });
+      const { month, year, startDate, endDate } = request.query;
+      const summary = await getMonthlySummary({
+        userId: request.userId,
+        ...(month !== undefined ? { month } : {}),
+        ...(year !== undefined ? { year } : {}),
+        ...(startDate !== undefined ? { startDate } : {}),
+        ...(endDate !== undefined ? { endDate } : {}),
+      });
       return reply.status(200).send(summary);
     },
   });

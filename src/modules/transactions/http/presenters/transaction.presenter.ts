@@ -44,6 +44,8 @@ export const presentTransactionListItem = (transaction: TransactionWithRelations
   userId: transaction.userId,
   installmentId: transaction.installmentId,
   installmentNumber: transaction.installmentNumber,
+  paidAt: transaction.paidAt,
+  paidByTransactionId: transaction.paidByTransactionId,
   createdAt: transaction.createdAt,
   updatedAt: transaction.updatedAt,
   category: transaction.category,
