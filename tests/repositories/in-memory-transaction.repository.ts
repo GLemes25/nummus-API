@@ -230,6 +230,7 @@ export const makeInMemoryTransactionRepository = (
         ...t,
         category: null,
         wallet: null,
+        invoice: invoices.find((i) => i.id === t.invoiceId) ?? null,
       }));
 
       return { data, totalCount };
