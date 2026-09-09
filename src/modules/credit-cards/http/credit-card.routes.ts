@@ -157,8 +157,13 @@ export const creditCardRoutes =
       handler: async (request, reply) => {
         await payInvoice({
           creditCardId: request.params.id,
+          invoiceId: request.body.invoiceId,
           walletId: request.body.walletId,
           userId: request.userId,
+          ...(request.body.transactionIds !== undefined
+            ? { transactionIds: request.body.transactionIds }
+            : {}),
+          ...(request.body.amount !== undefined ? { amount: request.body.amount } : {}),
         });
         return reply.status(204).send();
       },
