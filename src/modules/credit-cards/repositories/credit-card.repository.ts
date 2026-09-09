@@ -59,33 +59,58 @@ export const creditCardRepository = {
     });
   },
 
-  findOpenInvoicesByCard: async (creditCardId: string) => {
-    return prisma.creditCardInvoice.findMany({
-      where: { creditCardId, paid: false, deletedAt: null },
+  findInvoiceById: async (invoiceId: string) => {
+    return prisma.creditCardInvoice.findFirst({
+      where: { id: invoiceId, deletedAt: null },
     });
   },
 
-  payOpenInvoices: async (
-    creditCardId: string,
-    walletId: string,
-    totalAmount: number,
-    userId: string,
-    categoryId: string,
-  ) => {
+  findInvoiceTransactionsByIds: async (invoiceId: string, transactionIds: string[]) => {
+    return prisma.transaction.findMany({
+      where: { id: { in: transactionIds }, invoiceId, paidAt: null, deletedAt: null },
+    });
+  },
+
+  payInvoice: async (params: {
+    invoiceId: string;
+    walletId: string;
+    amount: number;
+    userId: string;
+    categoryId: string;
+    transactionIds?: string[];
+  }) => {
+    const { invoiceId, walletId, amount, userId, categoryId, transactionIds } = params;
+
     return prisma.$transaction(async (tx) => {
-      await tx.creditCardInvoice.updateMany({
-        where: { creditCardId, paid: false, deletedAt: null },
-        data: { paid: true },
+      const invoice = await tx.creditCardInvoice.update({
+        where: { id: invoiceId },
+        data: { paidAmount: { increment: amount } },
       });
+
+      const isFullyPaid = Number(invoice.paidAmount) >= Number(invoice.totalAmount);
+
+      if (isFullyPaid) {
+        await tx.creditCardInvoice.update({
+          where: { id: invoiceId },
+          data: { paid: true },
+        });
+      }
+
+      if (transactionIds && transactionIds.length > 0) {
+        await tx.transaction.updateMany({
+          where: { id: { in: transactionIds }, invoiceId },
+          data: { paidAt: new Date() },
+        });
+      }
 
       await tx.wallet.update({
         where: { id: walletId },
-        data: { balance: { decrement: totalAmount } },
+        data: { balance: { decrement: amount } },
       });
 
       await tx.transaction.create({
         data: {
-          amount: totalAmount,
+          amount,
           type: "EXPENSE",
           paymentMethod: "TRANSFER",
           status: "COMPLETED",
@@ -94,6 +119,7 @@ export const creditCardRepository = {
           walletId,
           categoryId,
           userId,
+          invoiceId,
         },
       });
     });
