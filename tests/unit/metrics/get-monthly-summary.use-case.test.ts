@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { faker } from "@faker-js/faker";
 import { makeGetMonthlySummaryUseCase } from "../../../src/modules/metrics/use-cases/get-monthly-summary.use-case.js";
 import { makeInMemoryMetricsRepository } from "../../repositories/in-memory-metrics.repository.js";
@@ -144,5 +144,85 @@ describe("makeGetMonthlySummaryUseCase", () => {
 
     // Assert
     expect(result.totalIncome).toBe(Math.round((10.005 + 20.005) * 100) / 100);
+  });
+
+  describe("default period (competência)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should default to the current month when no period params are given", async () => {
+      // Arrange — pin "today" to Aug 15th, 2024
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2024, 7, 15, 12));
+
+      const userId = faker.string.uuid();
+      repo.transactions.push(
+        { userId, walletId: "w1", amount: 1000, type: "INCOME", paymentMethod: "PIX", date: aug(10), deletedAt: null },
+        // Adjacent month must not leak into the default current-month range
+        { userId, walletId: "w1", amount: 5000, type: "INCOME", paymentMethod: "PIX", date: jul(20), deletedAt: null },
+      );
+
+      // Act
+      const result = await getMonthlySummary({ userId });
+
+      // Assert
+      expect(result.totalIncome).toBe(1000);
+    });
+
+    it("should resolve an explicit month+year into the matching date range", async () => {
+      // Arrange
+      const userId = faker.string.uuid();
+      repo.transactions.push(
+        { userId, walletId: "w1", amount: 1000, type: "INCOME", paymentMethod: "PIX", date: aug(1), deletedAt: null },
+        { userId, walletId: "w1", amount: 300, type: "EXPENSE", paymentMethod: "CASH", date: aug(5), deletedAt: null },
+        { userId, walletId: "w1", amount: 5000, type: "INCOME", paymentMethod: "PIX", date: jul(20), deletedAt: null },
+      );
+
+      // Act
+      const result = await getMonthlySummary({ userId, month: 8, year: 2024 });
+
+      // Assert
+      expect(result).toEqual({ totalIncome: 1000, totalExpense: 300, balance: 700 });
+    });
+
+    it("should not leak a future-dated (e.g. 2027) transaction into the current month's totals", async () => {
+      // Arrange — pin "today" to Aug 15th, 2024
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2024, 7, 15, 12));
+
+      const userId = faker.string.uuid();
+      repo.transactions.push(
+        { userId, walletId: "w1", amount: 1000, type: "INCOME", paymentMethod: "PIX", date: aug(10), deletedAt: null },
+        { userId, walletId: "w1", amount: 9999, type: "INCOME", paymentMethod: "PIX", date: new Date(2027, 0, 5), deletedAt: null },
+      );
+
+      // Act
+      const result = await getMonthlySummary({ userId });
+
+      // Assert
+      expect(result.totalIncome).toBe(1000);
+    });
+
+    it("should prioritize explicit startDate/endDate over month/year when both are present", async () => {
+      // Arrange
+      const userId = faker.string.uuid();
+      repo.transactions.push(
+        { userId, walletId: "w1", amount: 1000, type: "INCOME", paymentMethod: "PIX", date: aug(1), deletedAt: null },
+        { userId, walletId: "w1", amount: 5000, type: "INCOME", paymentMethod: "PIX", date: jul(20), deletedAt: null },
+      );
+
+      // Act — month/year point at August, but startDate/endDate point at July
+      const result = await getMonthlySummary({
+        userId,
+        month: 8,
+        year: 2024,
+        startDate: jul(1),
+        endDate: new Date(2024, 6, 31, 23, 59, 59, 999),
+      });
+
+      // Assert
+      expect(result.totalIncome).toBe(5000);
+    });
   });
 });

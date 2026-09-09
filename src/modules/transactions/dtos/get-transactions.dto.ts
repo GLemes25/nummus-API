@@ -14,6 +14,8 @@ export const getTransactionsSchema = z
       .positive("O limite deve ser maior que zero")
       .max(100, "O limite máximo é 100")
       .default(20),
+    month: z.coerce.number().int().min(1).max(12).optional(),
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
     startDate: z.coerce.date({ error: "A data inicial é inválida" }).optional(),
     endDate: z.coerce.date({ error: "A data final é inválida" }).optional(),
     search: z.string().optional(),
@@ -51,6 +53,8 @@ export const transactionListItemSchema = z.object({
   userId: z.string(),
   installmentId: z.string().nullable(),
   installmentNumber: z.number().int().nullable(),
+  paidAt: z.date().nullable(),
+  paidByTransactionId: z.string().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
   category: z

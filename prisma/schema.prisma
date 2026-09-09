@@ -359,6 +359,13 @@ model Transaction {
   costCenterId      String?
   costCenter        CostCenter?        @relation(fields: [costCenterId], references: [id])
 
+  // Liga uma transação de cartão liquidada (paidAt setado) à transação de pagamento
+  // (saída da carteira) que a quitou — necessário para reverter paidAt corretamente
+  // caso o pagamento seja excluído
+  paidByTransactionId String?
+  paidByTransaction    Transaction?  @relation("InvoicePayment", fields: [paidByTransactionId], references: [id])
+  settledTransactions  Transaction[] @relation("InvoicePayment")
+
   recurringTransactionId String?
   recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
 
@@ -381,6 +388,7 @@ model Transaction {
   @@index([creditCardId]) // extrato por cartão
   @@index([categoryId]) // gastos por categoria
   @@index([invoiceId]) // transações de uma fatura
+  @@index([paidByTransactionId]) // reversão de pagamento ao excluir a transação que quitou
   @@index([installmentId]) // agrupa parcelas de um parcelamento
   @@index([installmentPlanId]) // parcelas de um plano
   @@index([recurringTransactionId]) // ocorrências geradas por um mestre recorrente

@@ -96,19 +96,12 @@ export const creditCardRepository = {
         });
       }
 
-      if (transactionIds && transactionIds.length > 0) {
-        await tx.transaction.updateMany({
-          where: { id: { in: transactionIds }, invoiceId },
-          data: { paidAt: new Date() },
-        });
-      }
-
       await tx.wallet.update({
         where: { id: walletId },
         data: { balance: { decrement: amount } },
       });
 
-      await tx.transaction.create({
+      const paymentTransaction = await tx.transaction.create({
         data: {
           amount,
           type: "EXPENSE",
@@ -121,6 +114,46 @@ export const creditCardRepository = {
           userId,
           invoiceId,
         },
+      });
+
+      if (transactionIds && transactionIds.length > 0) {
+        await tx.transaction.updateMany({
+          where: { id: { in: transactionIds }, invoiceId },
+          data: { paidAt: new Date(), paidByTransactionId: paymentTransaction.id },
+        });
+      }
+    });
+  },
+
+  reopenInvoice: async (invoiceId: string) => {
+    return prisma.$transaction(async (tx) => {
+      // Transações de pagamento da fatura: saídas de carteira vinculadas à invoice, sem creditCardId
+      const paymentTransactions = await tx.transaction.findMany({
+        where: { invoiceId, creditCardId: null, deletedAt: null },
+      });
+
+      for (const paymentTransaction of paymentTransactions) {
+        if (paymentTransaction.walletId) {
+          await tx.wallet.update({
+            where: { id: paymentTransaction.walletId },
+            data: { balance: { increment: Number(paymentTransaction.amount) } },
+          });
+        }
+
+        await tx.transaction.update({
+          where: { id: paymentTransaction.id },
+          data: { deletedAt: new Date() },
+        });
+      }
+
+      await tx.transaction.updateMany({
+        where: { invoiceId, paidByTransactionId: { not: null } },
+        data: { paidAt: null, paidByTransactionId: null },
+      });
+
+      await tx.creditCardInvoice.update({
+        where: { id: invoiceId },
+        data: { paid: false, paidAmount: 0 },
       });
     });
   },

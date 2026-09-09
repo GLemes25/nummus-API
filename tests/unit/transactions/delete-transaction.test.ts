@@ -158,6 +158,286 @@ describe("makeDeleteTransactionUseCase", () => {
     expect(balanceAfterSecondDelete).toBe(1000);
   });
 
+  it("should revert invoice paidAmount and paid status when the invoice payment transaction is deleted", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const wallet = await walletRepo.create(makeFakeWallet({ userId, initialBalance: 1000 }));
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+
+    transactionRepo.invoices.push({
+      id: "inv-1",
+      creditCardId: faker.string.uuid(),
+      periodStartDate: faker.date.recent(),
+      periodEndDate: faker.date.soon(),
+      dueDate: faker.date.soon(),
+      totalAmount: 300,
+      paidAmount: 300,
+      paid: true,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // A payment transaction: wallet-side EXPENSE linked to the invoice, no creditCardId
+    const paymentTransaction = await createTransaction(
+      makeFakeTransaction({
+        userId,
+        walletId: wallet.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CASH",
+        amount: 300,
+      })
+    );
+    transactionRepo.items.find((t) => t.id === paymentTransaction.id)!.invoiceId = "inv-1";
+
+    expect(walletRepo.items.find((w) => w.id === wallet.id)?.balance).toBe(700);
+
+    // Act
+    await deleteTransaction({ transactionId: paymentTransaction.id, userId });
+
+    // Assert — wallet refunded and invoice rolled back to unpaid
+    expect(walletRepo.items.find((w) => w.id === wallet.id)?.balance).toBe(1000);
+    const invoice = transactionRepo.invoices.find((i) => i.id === "inv-1")!;
+    expect(invoice.paidAmount).toBe(0);
+    expect(invoice.paid).toBe(false);
+  });
+
+  it("should only partially revert paidAmount when the deleted payment did not cover the whole invoice", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const wallet = await walletRepo.create(makeFakeWallet({ userId, initialBalance: 1000 }));
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+
+    transactionRepo.invoices.push({
+      id: "inv-1",
+      creditCardId: faker.string.uuid(),
+      periodStartDate: faker.date.recent(),
+      periodEndDate: faker.date.soon(),
+      dueDate: faker.date.soon(),
+      totalAmount: 500,
+      paidAmount: 200,
+      paid: false,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const paymentTransaction = await createTransaction(
+      makeFakeTransaction({
+        userId,
+        walletId: wallet.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CASH",
+        amount: 200,
+      })
+    );
+    transactionRepo.items.find((t) => t.id === paymentTransaction.id)!.invoiceId = "inv-1";
+
+    // Act
+    await deleteTransaction({ transactionId: paymentTransaction.id, userId });
+
+    // Assert
+    const invoice = transactionRepo.invoices.find((i) => i.id === "inv-1")!;
+    expect(invoice.paidAmount).toBe(0);
+    expect(invoice.paid).toBe(false);
+  });
+
+  it("should clear paidAt on the card transactions settled by a deleted itemized payment", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const wallet = await walletRepo.create(makeFakeWallet({ userId, initialBalance: 1000 }));
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+    const creditCardId = faker.string.uuid();
+
+    transactionRepo.invoices.push({
+      id: "inv-1",
+      creditCardId,
+      periodStartDate: faker.date.recent(),
+      periodEndDate: faker.date.soon(),
+      dueDate: faker.date.soon(),
+      totalAmount: 200,
+      paidAmount: 200,
+      paid: true,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const paymentTransaction = await createTransaction(
+      makeFakeTransaction({
+        userId,
+        walletId: wallet.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CASH",
+        amount: 200,
+      })
+    );
+    const payment = transactionRepo.items.find((t) => t.id === paymentTransaction.id)!;
+    payment.invoiceId = "inv-1";
+
+    // Two card transactions that were settled by this payment
+    transactionRepo.items.push(
+      {
+        id: "card-tx-1",
+        amount: 120,
+        type: "EXPENSE",
+        paymentMethod: "CREDIT",
+        status: "COMPLETED",
+        date: new Date(),
+        description: "compra 1",
+        walletId: null,
+        creditCardId,
+        invoiceId: "inv-1",
+        categoryId: category.id,
+        userId,
+        installmentId: null,
+        installmentNumber: null,
+        paidAt: new Date(),
+        paidByTransactionId: paymentTransaction.id,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "card-tx-2",
+        amount: 80,
+        type: "EXPENSE",
+        paymentMethod: "CREDIT",
+        status: "COMPLETED",
+        date: new Date(),
+        description: "compra 2",
+        walletId: null,
+        creditCardId,
+        invoiceId: "inv-1",
+        categoryId: category.id,
+        userId,
+        installmentId: null,
+        installmentNumber: null,
+        paidAt: new Date(),
+        paidByTransactionId: paymentTransaction.id,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    );
+
+    // Act
+    await deleteTransaction({ transactionId: paymentTransaction.id, userId });
+
+    // Assert — both settled transactions are pending again
+    expect(transactionRepo.items.find((t) => t.id === "card-tx-1")!.paidAt).toBeNull();
+    expect(transactionRepo.items.find((t) => t.id === "card-tx-1")!.paidByTransactionId).toBeNull();
+    expect(transactionRepo.items.find((t) => t.id === "card-tx-2")!.paidAt).toBeNull();
+    expect(transactionRepo.items.find((t) => t.id === "card-tx-2")!.paidByTransactionId).toBeNull();
+
+    const invoice = transactionRepo.invoices.find((i) => i.id === "inv-1")!;
+    expect(invoice.paidAmount).toBe(0);
+    expect(invoice.paid).toBe(false);
+  });
+
+  it("should not revert the invoice twice when the payment transaction is deleted repeatedly", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const wallet = await walletRepo.create(makeFakeWallet({ userId, initialBalance: 1000 }));
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+
+    transactionRepo.invoices.push({
+      id: "inv-1",
+      creditCardId: faker.string.uuid(),
+      periodStartDate: faker.date.recent(),
+      periodEndDate: faker.date.soon(),
+      dueDate: faker.date.soon(),
+      totalAmount: 300,
+      paidAmount: 300,
+      paid: true,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const paymentTransaction = await createTransaction(
+      makeFakeTransaction({
+        userId,
+        walletId: wallet.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CASH",
+        amount: 300,
+      })
+    );
+    transactionRepo.items.find((t) => t.id === paymentTransaction.id)!.invoiceId = "inv-1";
+
+    // Act
+    await deleteTransaction({ transactionId: paymentTransaction.id, userId });
+    const invoiceAfterFirstDelete = { ...transactionRepo.invoices.find((i) => i.id === "inv-1")! };
+    const balanceAfterFirstDelete = walletRepo.items.find((w) => w.id === wallet.id)?.balance;
+
+    await deleteTransaction({ transactionId: paymentTransaction.id, userId });
+    const invoiceAfterSecondDelete = transactionRepo.invoices.find((i) => i.id === "inv-1")!;
+    const balanceAfterSecondDelete = walletRepo.items.find((w) => w.id === wallet.id)?.balance;
+
+    // Assert
+    expect(invoiceAfterFirstDelete.paidAmount).toBe(0);
+    expect(balanceAfterFirstDelete).toBe(1000);
+    expect(invoiceAfterSecondDelete.paidAmount).toBe(0);
+    expect(balanceAfterSecondDelete).toBe(1000);
+  });
+
+  it("should not revert the invoice when the deleted transaction is a card purchase, not a payment", async () => {
+    // Arrange — a CREDIT purchase transaction also carries an invoiceId, but it must
+    // never trigger the payment-reversal path (it has no walletId, has creditCardId)
+    const userId = faker.string.uuid();
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+    const creditCardId = faker.string.uuid();
+
+    transactionRepo.invoices.push({
+      id: "inv-1",
+      creditCardId,
+      periodStartDate: faker.date.recent(),
+      periodEndDate: faker.date.soon(),
+      dueDate: faker.date.soon(),
+      totalAmount: 300,
+      paidAmount: 100,
+      paid: false,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    transactionRepo.items.push({
+      id: "card-tx-1",
+      amount: 150,
+      type: "EXPENSE",
+      paymentMethod: "CREDIT",
+      status: "COMPLETED",
+      date: new Date(),
+      description: "compra no cartão",
+      walletId: null,
+      creditCardId,
+      invoiceId: "inv-1",
+      categoryId: category.id,
+      userId,
+      installmentId: null,
+      installmentNumber: null,
+      paidAt: null,
+      paidByTransactionId: null,
+      deletedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Act
+    await deleteTransaction({ transactionId: "card-tx-1", userId });
+
+    // Assert — invoice's paidAmount/paid are untouched by deleting a purchase transaction
+    const invoice = transactionRepo.invoices.find((i) => i.id === "inv-1")!;
+    expect(invoice.paidAmount).toBe(100);
+    expect(invoice.paid).toBe(false);
+  });
+
   it("should soft-delete a BALANCE_ADJUSTMENT transaction without reverting the wallet balance", async () => {
     // Arrange
     const userId = faker.string.uuid();

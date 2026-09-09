@@ -21,6 +21,9 @@ type InMemoryCreditCardInvoice = {
   paidAmount: number;
   paid: boolean;
   deletedAt: Date | null;
+  periodStartDate?: Date;
+  periodEndDate?: Date;
+  dueDate?: Date;
 };
 
 type InMemoryInvoiceTransaction = {
@@ -31,11 +34,13 @@ type InMemoryInvoiceTransaction = {
 };
 
 type InMemoryPaymentTransaction = {
+  id: string;
   walletId: string;
   amount: number;
   categoryId: string;
   userId: string;
   invoiceId: string;
+  deletedAt: Date | null;
 };
 
 type UpdateCreditCardData = {
@@ -160,7 +165,41 @@ export const makeInMemoryCreditCardRepository = (wallets?: InMemoryWallet[]) => 
         if (wallet) wallet.balance -= amount;
       }
 
-      paymentTransactions.push({ walletId, amount, categoryId, userId, invoiceId });
+      paymentTransactions.push({
+        id: randomUUID(),
+        walletId,
+        amount,
+        categoryId,
+        userId,
+        invoiceId,
+        deletedAt: null,
+      });
+    },
+
+    reopenInvoice: async (invoiceId: string) => {
+      const invoice = invoices.find((i) => i.id === invoiceId);
+      if (!invoice) return;
+
+      const relatedPayments = paymentTransactions.filter(
+        (p) => p.invoiceId === invoiceId && p.deletedAt === null,
+      );
+
+      for (const payment of relatedPayments) {
+        if (wallets) {
+          const wallet = wallets.find((w) => w.id === payment.walletId);
+          if (wallet) wallet.balance += payment.amount;
+        }
+        payment.deletedAt = new Date();
+      }
+
+      invoiceTransactions
+        .filter((t) => t.invoiceId === invoiceId && t.paidAt !== null)
+        .forEach((t) => {
+          t.paidAt = null;
+        });
+
+      invoice.paidAmount = 0;
+      invoice.paid = false;
     },
   };
 };

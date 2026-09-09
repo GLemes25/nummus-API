@@ -4,17 +4,30 @@ type MetricsRepository = typeof metricsRepository;
 
 type GetMonthlySummaryInput = {
   userId: string;
-  startDate: Date;
-  endDate: Date;
+  month?: number;
+  year?: number;
+  startDate?: Date;
+  endDate?: Date;
 };
 
 export const makeGetMonthlySummaryUseCase = (repository: MetricsRepository) => {
   return async (input: GetMonthlySummaryInput) => {
-    const transactions = await repository.findIncomeAndExpenseByPeriod(
-      input.userId,
-      input.startDate,
-      input.endDate,
-    );
+    let from: Date;
+    let to: Date;
+
+    if (input.startDate && input.endDate) {
+      from = input.startDate;
+      to = input.endDate;
+    } else {
+      const now = new Date();
+      const month = input.month ?? now.getMonth() + 1;
+      const year = input.year ?? now.getFullYear();
+
+      from = new Date(year, month - 1, 1);
+      to = new Date(year, month, 0, 23, 59, 59, 999); // último instante do mês (inclusivo)
+    }
+
+    const transactions = await repository.findIncomeAndExpenseByPeriod(input.userId, from, to);
 
     let totalIncome = 0;
     let totalExpense = 0;

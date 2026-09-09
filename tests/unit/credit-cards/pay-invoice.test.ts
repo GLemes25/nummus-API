@@ -40,6 +40,49 @@ describe("pay-invoice use case", () => {
     expect(walletRepo.items[0]!.balance).toBe(700);
   });
 
+  it("should allow paying the current (still open, not yet closed) invoice, not only past closed ones", async () => {
+    // Arrange
+    const walletRepo = makeInMemoryWalletRepository();
+    const cardRepo = makeInMemoryCreditCardRepository(walletRepo.items);
+    const categoryRepo = makeInMemoryCategoryRepository();
+    const payInvoice = makePayInvoiceUseCase(
+      cardRepo as any,
+      walletRepo.findById,
+      categoryRepo.findBySystemId,
+      categoryRepo.createSystemCategory,
+    );
+
+    const userId = "user-1";
+    const wallet = await walletRepo.create(makeFakeWallet({ userId, initialBalance: 1000 }));
+    const card = await cardRepo.create(makeFakeCreditCard({ userId }));
+
+    const now = new Date();
+    const periodStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const periodEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // The invoice's period end date is still in the future — it has not closed yet,
+    // it just started accruing this cycle's transactions
+    cardRepo.invoices.push({
+      id: "inv-current",
+      creditCardId: card.id,
+      totalAmount: 300,
+      paidAmount: 0,
+      paid: false,
+      deletedAt: null,
+      periodStartDate,
+      periodEndDate,
+      dueDate: new Date(now.getFullYear(), now.getMonth() + 1, 10),
+    });
+
+    // Act — pay the current, still-open invoice ahead of its due date
+    await payInvoice({ creditCardId: card.id, invoiceId: "inv-current", walletId: wallet.id, userId });
+
+    // Assert
+    expect(cardRepo.invoices[0]!.paid).toBe(true);
+    expect(cardRepo.invoices[0]!.paidAmount).toBe(300);
+    expect(walletRepo.items[0]!.balance).toBe(700);
+  });
+
   it("should partially pay an invoice with a given amount and keep it open", async () => {
     // Arrange
     const walletRepo = makeInMemoryWalletRepository();

@@ -7,8 +7,24 @@ type GetTransactionsInput = GetTransactionsDto & { userId: string };
 
 export const makeGetTransactionsUseCase = (repository: TransactionRepository) => {
   return async (data: GetTransactionsInput) => {
-    const { userId, page, limit, startDate, endDate, search, walletId, categoryId, creditCardId, type } =
-      data;
+    const { userId, page, limit, month, year, search, walletId, categoryId, creditCardId, type } = data;
+    let { startDate, endDate } = data;
+
+    // month/year só definem o período quando startDate/endDate explícitos não foram enviados —
+    // sem nenhum filtro de período a listagem deve continuar mostrando tudo (comportamento atual)
+    if (startDate === undefined && endDate === undefined && (month !== undefined || year !== undefined)) {
+      const now = new Date();
+      const effectiveYear = year ?? now.getFullYear();
+
+      if (month !== undefined) {
+        startDate = new Date(effectiveYear, month - 1, 1);
+        endDate = new Date(effectiveYear, month, 0, 23, 59, 59, 999); // último instante do mês (inclusivo)
+      } else {
+        // apenas year: cobre o ano inteiro (todas as competências daquele ano)
+        startDate = new Date(effectiveYear, 0, 1);
+        endDate = new Date(effectiveYear, 11, 31, 23, 59, 59, 999);
+      }
+    }
 
     const { data: transactions, totalCount } = await repository.findManyPaginated({
       userId,
