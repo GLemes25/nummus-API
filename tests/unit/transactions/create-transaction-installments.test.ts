@@ -232,6 +232,41 @@ describe("makeCreateTransactionUseCase — installments", () => {
     expect(p3!.status).toBe("PENDING");
   });
 
+  it("should set each credit card installment's date to its own invoice's closing date instead of the raw purchase-anniversary date", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const creditCard = { id: faker.string.uuid(), closingDay: 10, dueDay: 5, userId };
+    creditCards.push(creditCard);
+    // Aug 15 (after closing day 10) → 1ª parcela cai no fechamento de Set/10
+    const baseDate = new Date(2024, 7, 15);
+
+    // Act
+    await createTransaction({
+      userId,
+      walletId: undefined,
+      creditCardId: creditCard.id,
+      type: "EXPENSE",
+      paymentMethod: "CREDIT",
+      amount: 600,
+      date: baseDate,
+      description: "iPhone",
+      installments: 3,
+    });
+
+    // Assert — cada parcela "ensacada" no fechamento (dia 10) do respectivo mês da fatura,
+    // nunca no dia 15 (data nominal da compra/aniversário)
+    const [p1, p2, p3] = transactionRepo.items;
+
+    expect(p1!.date.getMonth()).toBe(8); // September
+    expect(p1!.date.getDate()).toBe(10);
+
+    expect(p2!.date.getMonth()).toBe(9); // October
+    expect(p2!.date.getDate()).toBe(10);
+
+    expect(p3!.date.getMonth()).toBe(10); // November
+    expect(p3!.date.getDate()).toBe(10);
+  });
+
   it("should skip months safely when date falls on the last day of a short month", async () => {
     // Arrange — Janeiro 31: +1 mês = Fevereiro (sem dia 31), deve ir para Feb 28
     const userId = faker.string.uuid();
