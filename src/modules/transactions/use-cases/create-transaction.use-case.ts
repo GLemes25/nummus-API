@@ -79,6 +79,9 @@ export const makeCreateTransactionUseCase = (
 
       if (installments > 1) {
         const installmentItems = Array.from({ length: installments }, (_, i) => {
+          // A data nominal da compra avança mês a mês; o closingDay do cartão decide em qual
+          // fatura cada parcela "ensaca" — a parcela nunca fica na data da compra, e sim na
+          // data de fechamento da fatura em que ela efetivamente cai
           const installmentDate = addMonths(data.date, i);
           const { periodStart, periodEnd, dueDate } = computeInvoicePeriod(
             installmentDate,
@@ -95,7 +98,7 @@ export const makeCreateTransactionUseCase = (
             amount,
             type: data.type,
             status: i === 0 ? initialStatus : "PENDING",
-            date: installmentDate,
+            date: periodEnd,
             description: `${data.description} (${i + 1}/${installments})`,
             creditCardId: data.creditCardId!,
             categoryId: data.categoryId ?? null,
@@ -117,11 +120,14 @@ export const makeCreateTransactionUseCase = (
         creditCard.dueDay
       );
 
+      // A competência da transação é a data de fechamento da fatura do ciclo em que a compra
+      // cai (não a data exata da compra), para não poluir o extrato do mês corrente quando a
+      // compra ocorre após o closingDay e pertence à fatura seguinte
       return repository.createWithInvoiceUpdate({
         amount: data.amount,
         type: data.type,
         status: initialStatus,
-        date: data.date,
+        date: periodEnd,
         description: data.description,
         creditCardId: data.creditCardId!,
         categoryId: data.categoryId ?? null,

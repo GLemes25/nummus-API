@@ -360,4 +360,64 @@ describe("makeCreateTransactionUseCase", () => {
     expect(transactionRepo.invoices[0]!.totalAmount).toBe(100);
     expect(transactionRepo.invoices[1]!.totalAmount).toBe(200);
   });
+
+  it("should set the transaction date to the invoice's closing date, not the raw purchase date, when the purchase is before the closing day", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+    // closingDay=10, dueDay=5
+    const creditCard = { id: faker.string.uuid(), closingDay: 10, dueDay: 5, userId };
+    creditCards.push(creditCard);
+
+    // Aug 8 → day 8 <= closingDay 10 → belongs to the period closing Aug 10
+    const transactionDate = new Date(2024, 7, 8);
+
+    // Act
+    const transaction = await createTransaction(
+      makeFakeTransaction({
+        userId,
+        walletId: undefined,
+        creditCardId: creditCard.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CREDIT",
+        amount: 100,
+        date: transactionDate,
+      })
+    );
+
+    // Assert — competência é a data de fechamento (Aug 10), não a data da compra (Aug 8)
+    expect(transaction.date.getMonth()).toBe(7); // August
+    expect(transaction.date.getDate()).toBe(10);
+  });
+
+  it("should set the transaction date to NEXT cycle's closing date when the purchase happens after the closing day", async () => {
+    // Arrange
+    const userId = faker.string.uuid();
+    const category = await categoryRepo.create(makeFakeCategory({ userId }));
+    // closingDay=10, dueDay=5
+    const creditCard = { id: faker.string.uuid(), closingDay: 10, dueDay: 5, userId };
+    creditCards.push(creditCard);
+
+    // Aug 15 → day 15 > closingDay 10 → belongs to the period closing Sep 10
+    const transactionDate = new Date(2024, 7, 15);
+
+    // Act
+    const transaction = await createTransaction(
+      makeFakeTransaction({
+        userId,
+        walletId: undefined,
+        creditCardId: creditCard.id,
+        categoryId: category.id,
+        type: "EXPENSE",
+        paymentMethod: "CREDIT",
+        amount: 200,
+        date: transactionDate,
+      })
+    );
+
+    // Assert — competência vai para o fechamento do PRÓXIMO mês (Sep 10), não fica em Ago
+    expect(transaction.date.getMonth()).toBe(8); // September
+    expect(transaction.date.getDate()).toBe(10);
+  });
 });
